@@ -103,7 +103,8 @@ export async function PUT(
     const id = params.id;
     const body = await request.json();
     // Expecting fields for VertexTarget, excluding serviceAccountKeyJson for standard PUT
-    const { name, projectId, location, modelId, dailyRateLimit } = body;
+    // Removed modelId from destructuring
+    const { name, projectId, location, dailyRateLimit } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -123,9 +124,7 @@ export async function PUT(
     if (location !== undefined && (typeof location !== 'string' || location.trim() === '')) {
         errors.location = 'Location must be a non-empty string.';
     }
-     if (modelId !== undefined && (typeof modelId !== 'string' || modelId.trim() === '')) {
-        errors.modelId = 'Model ID must be a non-empty string.';
-    }
+    // Removed modelId validation
 
     let validatedRateLimit: number | null | undefined = undefined; // Keep track of validated value
     if (dailyRateLimit !== undefined) {
@@ -171,10 +170,7 @@ export async function PUT(
       target.location = location.trim();
       updatedFields.push('location');
     }
-     if (modelId !== undefined) {
-      target.modelId = modelId.trim();
-      updatedFields.push('modelId');
-    }
+    // Removed modelId update
     if (validatedRateLimit !== undefined) {
       target.dailyRateLimit = validatedRateLimit;
       updatedFields.push('dailyRateLimit');
@@ -199,7 +195,7 @@ export async function PUT(
       name: target.name,
       projectId: target.projectId,
       location: target.location,
-      modelId: target.modelId,
+      // modelId: target.modelId, // Removed
       isActive: target.isActive,
       lastUsed: target.lastUsed,
       rateLimitResetAt: target.rateLimitResetAt,
@@ -219,9 +215,9 @@ export async function PUT(
   } catch (error: any) {
     logError(error, { context: 'PUT /api/admin/targets/:id' });
      // Check for specific duplicate key error if your DB driver provides it
-    if (error.message?.includes('duplicate key error')) { // Example check
+    if (error.message?.includes('duplicate key error')) { // Example check - Note: Duplicate check might need adjustment
         return NextResponse.json(
-            { error: "Updating this target would conflict with another existing target (e.g., same Project ID, Location, Model ID)." },
+            { error: "Updating this target would conflict with another existing target (e.g., same Project ID, Location)." }, // Adjusted error message
             { status: 409 } // Conflict
         );
     }

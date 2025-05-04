@@ -62,7 +62,7 @@ interface VertexTarget {
   name?: string;
   projectId: string;
   location: string;
-  modelId: string;
+  // modelId: string; // Removed
   isActive: boolean;
   lastUsed: string | null;
   rateLimitResetAt: string | null;
@@ -105,9 +105,10 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
   const [editLocationValue, setEditLocationValue] = useState('');   // Added state
   const [editLocationCustomValue, setEditLocationCustomValue] = useState('');
   const [isEditCustomLocation, setIsEditCustomLocation] = useState(false);
-  const [editModelIdValue, setEditModelIdValue] = useState('');     // Added state
-  const [editModelIdCustomValue, setEditModelIdCustomValue] = useState('');
-  const [isEditCustomModelId, setIsEditCustomModelId] = useState(false);
+  // Removed Model ID state
+  // const [editModelIdValue, setEditModelIdValue] = useState('');
+  // const [editModelIdCustomValue, setEditModelIdCustomValue] = useState('');
+  // const [isEditCustomModelId, setIsEditCustomModelId] = useState(false);
   const [editRateLimitValue, setEditRateLimitValue] = useState<string>('');
   const [isSavingChanges, setIsSavingChanges] = useState(false);
 
@@ -270,16 +271,16 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
       setIsEditCustomLocation(true);
     }
 
-    // Check if model ID is in predefined options
-    const modelIdExists = modelIdOptions.some(option => option.value === target.modelId);
-    if (modelIdExists) {
-      setEditModelIdValue(target.modelId);
-      setIsEditCustomModelId(false);
-    } else {
-      setEditModelIdValue('custom');
-      setEditModelIdCustomValue(target.modelId);
-      setIsEditCustomModelId(true);
-    }
+    // Removed Model ID logic
+    // const modelIdExists = modelIdOptions.some(option => option.value === target.modelId);
+    // if (modelIdExists) {
+    //   setEditModelIdValue(target.modelId);
+    //   setIsEditCustomModelId(false);
+    // } else {
+    //   setEditModelIdValue('custom');
+    //   setEditModelIdCustomValue(target.modelId);
+    //   setIsEditCustomModelId(true);
+    // }
 
     setEditRateLimitValue(target.dailyRateLimit?.toString() ?? '');
     onEditOpen();
@@ -297,26 +298,16 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
     }
   };
 
-  // Handle model ID selection in edit modal
-  const handleEditModelIdChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    if (value === 'custom') {
-      setIsEditCustomModelId(true);
-      setEditModelIdValue('custom');
-    } else {
-      setIsEditCustomModelId(false);
-      setEditModelIdValue(value);
-    }
-  };
+  // Removed handleEditModelIdChange
 
   // Function to save the edited changes
   const handleSaveTargetChanges = async () => { // Renamed function
     if (!editingTarget) return;
     setIsSavingChanges(true);
 
-    // Get the actual location and model ID values (either from dropdown or custom input)
+    // Get the actual location value (either from dropdown or custom input)
     const locationValue = isEditCustomLocation ? editLocationCustomValue.trim() : editLocationValue.trim();
-    const modelIdValue = isEditCustomModelId ? editModelIdCustomValue.trim() : editModelIdValue.trim();
+    // Removed modelIdValue
 
     // --- Input Validation ---
     let rateLimitToSend: number | null = null;
@@ -331,9 +322,9 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
       }
       rateLimitToSend = parsedLimit;
     }
-    // Validate new fields
-    if (!editProjectIdValue.trim() || !locationValue || !modelIdValue) {
-         toast({ title: 'Invalid Input', description: 'Project ID, Location, and Model ID cannot be empty.', status: 'error', duration: 4000, isClosable: true });
+    // Validate new fields (removed modelIdValue)
+    if (!editProjectIdValue.trim() || !locationValue) {
+         toast({ title: 'Invalid Input', description: 'Project ID and Location cannot be empty.', status: 'error', duration: 4000, isClosable: true }); // Updated description
          setIsSavingChanges(false);
          return;
     }
@@ -344,7 +335,7 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
         name: editNameValue.trim() || undefined,
         projectId: editProjectIdValue.trim(), // Add new field
         location: locationValue,   // Use the resolved location value
-        modelId: modelIdValue,     // Use the resolved model ID value
+        // modelId: modelIdValue, // Removed
         dailyRateLimit: rateLimitToSend,
         // SA Key JSON is NOT updated via this PUT request
       };
@@ -579,7 +570,7 @@ return (
                <Th>Name</Th>
                <Th>Project ID</Th> {/* Updated Header */}
                <Th>Location</Th> {/* Updated Header */}
-               <Th>Model ID</Th> {/* Updated Header */}
+               {/* <Th>Model ID</Th> Removed Header */}
                <Th>Status</Th>
                <Th>Last Used</Th>
                <Th>Daily Usage / Limit</Th>
@@ -599,7 +590,7 @@ return (
                     <Td><Skeleton height="20px" width="100px" /></Td>
                     <Td><Skeleton height="20px" width="120px" /></Td> {/* Adjusted width */}
                     <Td><Skeleton height="20px" width="80px" /></Td> {/* Adjusted width */}
-                    <Td><Skeleton height="20px" width="150px" /></Td> {/* Adjusted width */}
+                    {/* <Td><Skeleton height="20px" width="150px" /></Td> Removed Skeleton */}
                     <Td><Skeleton height="20px" width="80px" /></Td>
                     <Td><Skeleton height="20px" width="150px" /></Td>
                     <Td><Skeleton height="20px" width="100px" /></Td>
@@ -612,7 +603,7 @@ return (
              : !Array.isArray(targets) || targets.length === 0 // Check if it's an array AND empty
              ? /* No Targets State */
                <Tr>
-                  <Td colSpan={12} textAlign="center" py={4}> {/* Updated colSpan */}
+                  <Td colSpan={11} textAlign="center" py={4}> {/* Adjusted colSpan */}
                     No Vertex targets found. Add a target to get started. {/* Updated text */}
                   </Td>
                 </Tr>
@@ -628,7 +619,7 @@ return (
                     <Td>{target.name || <Text as="i" color="gray.500">N/A</Text>}</Td>
                     <Td>{target.projectId}</Td> {/* Display Project ID */}
                     <Td>{target.location}</Td> {/* Display Location */}
-                    <Td>{target.modelId}</Td> {/* Display Model ID */}
+                    {/* <Td>{target.modelId}</Td> Removed Model ID */}
                     <Td>{getStatusBadge(target)}</Td>
                     <Td>{formatDate(target.lastUsed)}</Td>
                     <Td>{target.dailyRequestsUsed} / {(target.dailyRateLimit === null || target.dailyRateLimit === undefined) ? '∞' : target.dailyRateLimit}</Td>
@@ -747,43 +738,7 @@ return (
               )}
             </FormControl>
 
-             <FormControl isRequired mb={4}> {/* Model ID */}
-              <FormLabel>Model ID</FormLabel>
-              {!isEditCustomModelId ? (
-                <Select
-                  placeholder="Select model ID"
-                  value={editModelIdValue}
-                  onChange={handleEditModelIdChange}
-                >
-                  {modelIdOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                  <option value="custom">Custom model ID...</option>
-                </Select>
-              ) : (
-                <InputGroup>
-                  <Input
-                    placeholder="Enter custom model ID (e.g., gemini-2.5-pro)"
-                    value={editModelIdCustomValue}
-                    onChange={(e) => setEditModelIdCustomValue(e.target.value)}
-                  />
-                  <InputRightElement width="4.5rem">
-                    <Button
-                      h="1.75rem"
-                      size="sm"
-                      onClick={() => {
-                        setIsEditCustomModelId(false);
-                        setEditModelIdValue('');
-                      }}
-                    >
-                      Back
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
-              )}
-            </FormControl>
+            {/* Removed Model ID FormControl */}
 
             {/* Daily Rate Limit Input */}
             <FormControl>

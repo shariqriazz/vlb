@@ -63,7 +63,6 @@ async function initializeDatabase(): Promise<Database> {
       _id TEXT PRIMARY KEY,
       projectId TEXT NOT NULL,
       location TEXT NOT NULL,
-      modelId TEXT NOT NULL,
       serviceAccountKeyJson TEXT NOT NULL,
       name TEXT,
       isActive BOOLEAN NOT NULL DEFAULT TRUE,

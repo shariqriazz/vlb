@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
 
     try {
       for (const targetData of importedTargets) { // Loop through targets
-        // Basic validation for required VertexTarget fields
-        const requiredFields: (keyof VertexTargetData)[] = ['projectId', 'location', 'modelId', 'serviceAccountKeyJson'];
+        // Basic validation for required VertexTarget fields (removed modelId)
+        const requiredFields: (keyof VertexTargetData)[] = ['projectId', 'location', 'serviceAccountKeyJson'];
         const missingFields = requiredFields.filter(field => !targetData[field] || typeof targetData[field] !== 'string');
 
         if (missingFields.length > 0) {
@@ -71,10 +71,10 @@ export async function POST(req: NextRequest) {
           }
           // If not found by _id or _id wasn't provided, try the unique combination
           if (!existingTarget) {
+              // Removed modelId from findOne query
               existingTarget = await VertexTarget.findOne({
                   projectId: targetData.projectId,
                   location: targetData.location,
-                  modelId: targetData.modelId
               });
           }
 
@@ -119,8 +119,8 @@ export async function POST(req: NextRequest) {
             logTargetEvent('Target Added (Import)', { targetId: newTarget._id }); // Use logTargetEvent
           }
         } catch (targetError: any) {
-          // Construct a more informative error identifier
-          const identifier = targetData._id || `${targetData.projectId}/${targetData.location}/${targetData.modelId}`;
+          // Construct a more informative error identifier (removed modelId)
+          const identifier = targetData._id || `${targetData.projectId}/${targetData.location}`;
           errors.push(`Error processing target '${identifier}': ${targetError.message}`);
           errorCount++;
           // Continue processing other targets

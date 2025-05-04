@@ -1,44 +1,45 @@
 export const dynamic = 'force-dynamic'; // Force dynamic rendering
 import { NextRequest, NextResponse } from 'next/server';
 // Removed axios, keyManager, readSettings imports
-import { VertexTarget } from '@/lib/models/VertexTarget'; // Import VertexTarget
+// Removed VertexTarget import
 import { logError } from '@/lib/services/logger';
 
 /**
- * Returns a list of configured and active Vertex AI target names,
- * formatted like the OpenAI /v1/models response.
- * The load balancer uses these targets internally based on rotation logic,
- * ignoring the model specified by the client.
+ * Returns a static list of usable models, formatted like the OpenAI /v1/models response.
+ * In this refactored version, the client specifies the model.
  */
 export async function GET(req: NextRequest) {
   try {
-    // Fetch active targets from the database
-    const activeTargets = await VertexTarget.findAll({ isActive: true });
+    // Define the list of models this load balancer supports
+    // For now, just the one specified by the user. This could be made dynamic later.
+    const supportedModels = [
+      {
+        id: "gemini-2.5-pro-exp-03-25", // The specific model ID
+        object: "model",
+        owned_by: "google", // Or appropriate owner
+        // Add other relevant fields if known (e.g., context window)
+      },
+      // Add other models here if the load balancer intends to support them
+    ];
 
-    if (!activeTargets || activeTargets.length === 0) {
-      logError(new Error('No active Vertex AI targets found'), { context: 'Models endpoint - findAll active' });
-      return NextResponse.json(
-        { error: { message: 'No active Vertex AI targets configured or available.', type: 'no_targets_available' } },
-        { status: 503 } // Service Unavailable
-      );
-    }
-
-    // Format the response according to OpenAI API spec
-    const modelsData = activeTargets.map(target => ({
-      id: target.name || target._id, // Use target name or fallback to ID
-      object: "model",
-      // created: Math.floor(new Date(Date.now()).getTime() / 1000), // Removed 'created' field as no source data
-      owned_by: "vertex-ai-lb", // Placeholder owner
-      // Add other fields if needed, though 'id' and 'object' are primary
-    }));
+    // Check if there are any active targets at all, otherwise models aren't really available
+    // This check can be refined later if needed
+    // const activeTargets = await VertexTarget.findAll({ isActive: true });
+    // if (!activeTargets || activeTargets.length === 0) {
+    //   logError(new Error('No active Vertex AI targets found'), { context: 'Models endpoint - Check active targets' });
+    //   return NextResponse.json(
+    //     { error: { message: 'No active Vertex AI targets configured or available to serve models.', type: 'no_targets_available' } },
+    //     { status: 503 } // Service Unavailable
+    //   );
+    // }
 
     return NextResponse.json({
       object: "list",
-      data: modelsData,
+      data: supportedModels,
     });
 
   } catch (error: any) {
-    logError(error, { context: 'Models endpoint - Error fetching targets' });
+    logError(error, { context: 'Models endpoint - Error generating model list' });
 
     // Return a generic error
     return NextResponse.json(

@@ -23,7 +23,7 @@ export async function GET(req: Request) {
         name: targetInstance.name,
         projectId: targetInstance.projectId,
         location: targetInstance.location,
-        modelId: targetInstance.modelId,
+        // modelId: targetInstance.modelId, // Removed
         serviceAccountKeyJson: targetInstance.serviceAccountKeyJson, // Include SA Key
         isActive: targetInstance.isActive,
         lastUsed: targetInstance.lastUsed,

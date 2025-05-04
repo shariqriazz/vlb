@@ -32,7 +32,8 @@ type GenerateContentStreamResponse = AsyncGenerator<GenerateContentResponse>;
 
 // Helper function to handle streaming response (Vertex AI version)
 // Update type hint for the stream
-async function handleStreamingResponseVertex(vertexStream: GenerateContentStreamResponse, modelIdUsed: string) {
+// Pass the model requested by the client for response consistency
+async function handleStreamingResponseVertex(vertexStream: GenerateContentStreamResponse, requestedModel: string) {
   const encoder = new TextEncoder();
   const streamId = `chatcmpl-${uuidv4()}`;
   const created = Math.floor(Date.now() / 1000);
@@ -56,7 +57,7 @@ async function handleStreamingResponseVertex(vertexStream: GenerateContentStream
               id: streamId,
               object: 'chat.completion.chunk',
               created: created,
-              model: modelIdUsed,
+              model: requestedModel, // Use requestedModel
               choices: [
                 {
                   index: 0,
@@ -78,7 +79,7 @@ async function handleStreamingResponseVertex(vertexStream: GenerateContentStream
                id: streamId,
                object: 'chat.completion.chunk',
                created: created,
-               model: modelIdUsed,
+               model: requestedModel, // Use requestedModel
                choices: [
                  {
                    index: 0,
@@ -102,13 +103,13 @@ async function handleStreamingResponseVertex(vertexStream: GenerateContentStream
         // Send the final DONE message
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
       } catch (error: any) {
-        logError(error, { context: 'Chat completions - Stream Processing Error', modelId: modelIdUsed });
+        logError(error, { context: 'Chat completions - Stream Processing Error', modelId: requestedModel }); // Use requestedModel
         // Send an error chunk in the stream
         const errorChunk = {
           id: streamId,
           object: 'chat.completion.chunk',
           created: created,
-          model: modelIdUsed,
+          model: requestedModel, // Use requestedModel
           choices: [], // No choices on error
           error: {
             message: `Stream error: ${error.message || 'Unknown stream error'}`,
@@ -368,19 +369,20 @@ function mapVertexFinishReason(vertexReason: FinishReason | null | undefined): s
 
 // Helper function to translate Vertex AI response to OpenAI Chat Completion format
 // Update type hint to use GenerateContentResponse
-function translateVertexToOpenAiChatCompletion(vertexResponse: GenerateContentResponse, modelIdUsed: string): any {
+// Pass the model requested by the client for response consistency
+function translateVertexToOpenAiChatCompletion(vertexResponse: GenerateContentResponse, requestedModel: string): any {
     const completionId = `chatcmpl-${uuidv4()}`;
     const created = Math.floor(Date.now() / 1000);
     // Use the structure directly if Candidate type isn't imported
     const choice = vertexResponse.candidates?.[0];
 
     if (!choice) {
-        logError(new Error("No candidates received from Vertex AI response."), { modelIdUsed });
+        logError(new Error("No candidates received from Vertex AI response."), { modelIdUsed: requestedModel }); // Use requestedModel
         return { // Return a valid OpenAI error structure
              id: completionId,
              object: 'chat.completion',
              created: created,
-             model: modelIdUsed,
+             model: requestedModel, // Use requestedModel
              choices: [{
                  index: 0,
                  message: { role: 'assistant', content: null }, // Null content on error
@@ -445,7 +447,7 @@ function translateVertexToOpenAiChatCompletion(vertexResponse: GenerateContentRe
         id: completionId,
         object: 'chat.completion',
         created: created,
-        model: modelIdUsed,
+        model: requestedModel, // Use requestedModel
         choices: [responseChoice],
         usage: usage,
     };
@@ -499,7 +501,18 @@ export async function POST(req: NextRequest) {
     );
   }
   const isStreaming = body?.stream === true;
-  const requestedModel = body?.model;
+  const requestedModel = body?.model as string | undefined; // Get model requested by client
+
+  // --- Validate requestedModel ---
+  if (!requestedModel || typeof requestedModel !== 'string') {
+      logError(new Error('Missing or invalid "model" parameter in request body.'), { context: 'Chat completions - Body Validation', requestId });
+      return NextResponse.json(
+          { error: { message: 'Missing or invalid "model" parameter in request body.', type: 'invalid_request_error' } },
+          { status: 400 }
+      );
+  }
+  // --- End Validation ---
+
 
   requestLogger.info('Incoming Request', {
     requestId,
@@ -519,9 +532,10 @@ export async function POST(req: NextRequest) {
     let vertexAI: VertexAI | null = null;
 
     try {
-      currentTarget = await targetManager.getTarget();
+      // Pass requestedModel to getTarget (targetManager needs update)
+      currentTarget = await targetManager.getTarget(requestedModel);
       if (!currentTarget) {
-          throw new Error('No available Vertex AI targets found or all are currently throttled/disabled.');
+          throw new Error(`No available Vertex AI targets found for model ${requestedModel} or all are currently throttled/disabled.`);
       }
       targetIdForAttempt = currentTarget._id.toString();
 
@@ -555,13 +569,14 @@ export async function POST(req: NextRequest) {
           }
       });
 
-      const modelId = currentTarget.modelId;
+      // const modelId = currentTarget.modelId; // Removed - use requestedModel
 
       if (!vertexAI) { // Check added for safety, though unlikely if constructor doesn't throw
           throw new Error("VertexAI client was not initialized correctly.");
       }
+      // Use the model requested by the client
       const generativeModel = vertexAI.getGenerativeModel({
-          model: modelId,
+          model: requestedModel,
           // safetySettings: [{ category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }],
       });
 
@@ -590,15 +605,16 @@ export async function POST(req: NextRequest) {
             targetId: targetIdForAttempt || 'TARGET_UNAVAILABLE', // Provide fallback
             statusCode: 200,
             isError: false,
-            modelUsed: modelId,
-            requestedModel: requestedModel,
+            modelUsed: requestedModel, // Log the model actually used
+            requestedModel: requestedModel, // Log the model client asked for
             responseTime: responseTime,
             ipAddress: ipAddress || null,
             isStreaming: true,
             requestId: requestId,
         }).catch(dbError => logError(dbError, { context: 'RequestLog DB Write Error (Stream Success)' }));
 
-        return handleStreamingResponseVertex(streamResult.stream, modelId);
+        // Pass requestedModel to streaming handler
+        return handleStreamingResponseVertex(streamResult.stream, requestedModel);
 
       } else {
         // Type for result can be inferred or use GenerateContentResult if correctly imported/defined
@@ -607,15 +623,16 @@ export async function POST(req: NextRequest) {
 
         await targetManager.markTargetSuccess(); // Corrected: No arguments
 
-        const openAiResponse = translateVertexToOpenAiChatCompletion(response, modelId);
+        // Pass requestedModel to response translator
+        const openAiResponse = translateVertexToOpenAiChatCompletion(response, requestedModel);
 
         const responseTime = Date.now() - startTime;
         await RequestLog.create({
             targetId: targetIdForAttempt || 'TARGET_UNAVAILABLE', // Provide fallback
             statusCode: 200,
             isError: false,
-            modelUsed: modelId,
-            requestedModel: requestedModel,
+            modelUsed: requestedModel, // Log the model actually used
+            requestedModel: requestedModel, // Log the model client asked for
             promptTokens: response.usageMetadata?.promptTokenCount,
             completionTokens: response.usageMetadata?.candidatesTokenCount,
             totalTokens: response.usageMetadata?.totalTokenCount,
@@ -680,8 +697,8 @@ export async function POST(req: NextRequest) {
         isError: true,
         errorType: errorType,
         errorMessage: errorMessage,
-        modelUsed: currentTarget?.modelId || requestedModel || 'UNKNOWN',
-        requestedModel: requestedModel,
+        modelUsed: requestedModel || 'UNKNOWN', // Log the model we attempted to use
+        requestedModel: requestedModel, // Log the model client asked for
         responseTime: responseTime,
         ipAddress: ipAddress || null,
         isStreaming: isStreaming,
@@ -742,8 +759,8 @@ export async function POST(req: NextRequest) {
     isError: true,
     errorType: finalErrorType,
     errorMessage: finalErrorMessage,
-    modelUsed: requestedModel || 'UNKNOWN',
-    requestedModel: requestedModel,
+    modelUsed: requestedModel || 'UNKNOWN', // Log the model we attempted to use
+    requestedModel: requestedModel, // Log the model client asked for
     responseTime: finalResponseTime,
     ipAddress: ipAddress || null,
     isStreaming: isStreaming,

@@ -23,8 +23,9 @@ class TargetManager {
 
   async initialize() {
     // Call getTarget() which will handle initial rotation if needed
+    // Pass a default model, e.g., the one mentioned by the user, or make this configurable
     if (!this.currentTarget) {
-      await this.getTarget();
+      await this.getTarget("gemini-2.5-pro-exp-03-25"); // Pass default model
     }
   }
 
@@ -123,7 +124,7 @@ class TargetManager {
         targetId: target._id,
         projectId: target.projectId, // Log relevant target info
         location: target.location,
-        modelId: target.modelId,
+        // modelId: target.modelId, // Removed
         lastUsed: target.lastUsed,
         failureCount: target.failureCount,
         rotationType: 'scheduled'
@@ -149,7 +150,7 @@ class TargetManager {
           targetId: this.currentTarget._id,
           projectId: this.currentTarget.projectId, // Log relevant target info
           location: this.currentTarget.location,
-          modelId: this.currentTarget.modelId,
+          // modelId: this.currentTarget.modelId, // Removed
           lastUsed: this.currentTarget.lastUsed,
           requestCount: this.currentTarget.requestCount,
           dailyRequestsUsed: this.currentTarget.dailyRequestsUsed,
@@ -184,7 +185,7 @@ class TargetManager {
           targetId: targetToUpdate._id,
           projectId: targetToUpdate.projectId, // Log relevant target info
           location: targetToUpdate.location,
-          modelId: targetToUpdate.modelId,
+          // modelId: targetToUpdate.modelId, // Removed
           resetTime: targetToUpdate.rateLimitResetAt
         });
 
@@ -210,7 +211,7 @@ class TargetManager {
           targetId: targetToUpdate._id, // Corrected variable name
           projectId: targetToUpdate.projectId, // Log relevant target info
           location: targetToUpdate.location,
-          modelId: targetToUpdate.modelId,
+          // modelId: targetToUpdate.modelId, // Removed
           reason: `Failure count reached threshold (${maxFailures})`,
           failureCount: targetToUpdate.failureCount
         });
@@ -239,7 +240,8 @@ class TargetManager {
     }); // End mutex runExclusive
   }
 
-  async getTarget(): Promise<VertexTarget> {
+  // Accept requestedModel, though current logic doesn't filter by it yet
+  async getTarget(requestedModel?: string): Promise<VertexTarget> {
     // Wrap the entire target getting/rotation logic in a mutex
     return await this.mutex.runExclusive(async () => {
       try {
@@ -317,7 +319,7 @@ class TargetManager {
   async addTarget(data: {
     projectId: string;
     location: string;
-    modelId: string;
+    // modelId: string; // Removed
     serviceAccountKeyJson: string;
     name?: string;
     dailyRateLimit?: number | null;
@@ -325,10 +327,11 @@ class TargetManager {
     // Although less critical, lock addTarget to prevent potential race conditions
     // if a rotation happens while adding/reactivating a target.
     return await this.mutex.runExclusive(async () => {
-      const { projectId, location, modelId, serviceAccountKeyJson, name, dailyRateLimit } = data;
+      // Removed modelId from destructuring
+      const { projectId, location, serviceAccountKeyJson, name, dailyRateLimit } = data;
       try {
-      // Find existing target by unique combination (adjust as needed)
-      const existingTarget = await VertexTarget.findOne({ projectId, location, modelId });
+      // Find existing target by unique combination (projectId, location)
+      const existingTarget = await VertexTarget.findOne({ projectId, location });
 
       if (existingTarget) {
         // Update existing target (e.g., reactivate, update name/limit/key)
@@ -347,7 +350,7 @@ class TargetManager {
           targetId: existingTarget._id,
           projectId: existingTarget.projectId,
           location: existingTarget.location,
-          modelId: existingTarget.modelId,
+          // modelId: existingTarget.modelId, // Removed
         });
 
         return existingTarget;
@@ -357,7 +360,7 @@ class TargetManager {
       const newTarget = await VertexTarget.create({
         projectId,
         location,
-        modelId,
+        // modelId, // Removed
         serviceAccountKeyJson,
         name,
         dailyRateLimit
@@ -367,7 +370,7 @@ class TargetManager {
         targetId: newTarget._id,
         projectId: newTarget.projectId,
         location: newTarget.location,
-        modelId: newTarget.modelId,
+        // modelId: newTarget.modelId, // Removed
       });
 
       return newTarget;

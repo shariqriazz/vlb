@@ -40,7 +40,7 @@ interface VertexTarget {
   name?: string;
   projectId: string;
   location: string;
-  modelId: string;
+  // modelId: string; // Removed
   // serviceAccountKeyJson is not typically needed in the list view
   isActive: boolean;
   lastUsed: string | null;
@@ -63,9 +63,10 @@ export default function TargetsPage() { // Renamed component
   const [newLocation, setNewLocation] = useState('');
   const [newLocationCustom, setNewLocationCustom] = useState('');
   const [isCustomLocation, setIsCustomLocation] = useState(false);
-  const [newModelId, setNewModelId] = useState('');
-  const [newModelIdCustom, setNewModelIdCustom] = useState('');
-  const [isCustomModelId, setIsCustomModelId] = useState(false);
+  // Removed Model ID state
+  // const [newModelId, setNewModelId] = useState('');
+  // const [newModelIdCustom, setNewModelIdCustom] = useState('');
+  // const [isCustomModelId, setIsCustomModelId] = useState(false);
   const [newDailyRateLimit, setNewDailyRateLimit] = useState('');
   const [newSaKeyFile, setNewSaKeyFile] = useState<File | null>(null); // State for file upload
 
@@ -96,15 +97,15 @@ export default function TargetsPage() { // Renamed component
   }, []);
 
   const handleAddTarget = async () => { // Renamed function
-    // Get the actual location and model ID values (either from dropdown or custom input)
+    // Get the actual location value (either from dropdown or custom input)
     const locationValue = isCustomLocation ? newLocationCustom.trim() : newLocation.trim();
-    const modelIdValue = isCustomModelId ? newModelIdCustom.trim() : newModelId.trim();
+    // Removed modelIdValue
 
-    // Validation for required fields
-    if (!newProjectId.trim() || !locationValue || !modelIdValue || !newSaKeyFile) {
+    // Validation for required fields (removed modelIdValue)
+    if (!newProjectId.trim() || !locationValue || !newSaKeyFile) {
       toast({
         title: 'Error',
-        description: 'Project ID, Location, Model ID, and Service Account Key file are required.',
+        description: 'Project ID, Location, and Service Account Key file are required.', // Updated description
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -117,7 +118,7 @@ export default function TargetsPage() { // Renamed component
     formData.append('name', newName.trim());
     formData.append('projectId', newProjectId.trim());
     formData.append('location', locationValue);
-    formData.append('modelId', modelIdValue);
+    // Removed formData.append('modelId', modelIdValue);
     // Append rate limit only if it's a valid number, otherwise backend handles default (null)
     const rateLimitNum = parseInt(newDailyRateLimit.trim(), 10);
     if (!isNaN(rateLimitNum) && rateLimitNum >= 0) {
@@ -163,9 +164,10 @@ export default function TargetsPage() { // Renamed component
       setNewLocation('');
       setNewLocationCustom('');
       setIsCustomLocation(false);
-      setNewModelId('');
-      setNewModelIdCustom('');
-      setIsCustomModelId(false);
+      // Removed Model ID reset
+      // setNewModelId('');
+      // setNewModelIdCustom('');
+      // setIsCustomModelId(false);
       setNewDailyRateLimit('');
       setNewSaKeyFile(null);
       // Reset file input visually (optional, might need ref)
@@ -206,17 +208,7 @@ export default function TargetsPage() { // Renamed component
     }
   };
 
-  // Handle model ID selection
-  const handleModelIdChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    if (value === 'custom') {
-      setIsCustomModelId(true);
-      setNewModelId('custom');
-    } else {
-      setIsCustomModelId(false);
-      setNewModelId(value);
-    }
-  };
+  // Removed handleModelIdChange
 
 
   return (
@@ -308,43 +300,7 @@ export default function TargetsPage() { // Renamed component
                 </InputGroup>
               )}
             </FormControl>
-             <FormControl isRequired mb={4}>
-              <FormLabel>Model ID</FormLabel>
-              {!isCustomModelId ? (
-                <Select
-                  placeholder="Select model ID"
-                  value={newModelId}
-                  onChange={handleModelIdChange}
-                >
-                  {modelIdOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                  <option value="custom">Custom model ID...</option>
-                </Select>
-              ) : (
-                <InputGroup>
-                  <Input
-                    placeholder="Enter custom model ID (e.g., gemini-2.5-pro)"
-                    value={newModelIdCustom}
-                    onChange={(e) => setNewModelIdCustom(e.target.value)}
-                  />
-                  <InputRightElement width="4.5rem">
-                    <Button
-                      h="1.75rem"
-                      size="sm"
-                      onClick={() => {
-                        setIsCustomModelId(false);
-                        setNewModelId('');
-                      }}
-                    >
-                      Back
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
-              )}
-            </FormControl>
+            {/* Removed Model ID FormControl */}
              <FormControl isRequired mb={4}>
               <FormLabel>Service Account Key (JSON)</FormLabel>
               <Input

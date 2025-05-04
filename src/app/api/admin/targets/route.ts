@@ -14,7 +14,7 @@ export async function GET() {
       name: targetInstance.name,
       projectId: targetInstance.projectId,
       location: targetInstance.location,
-      modelId: targetInstance.modelId,
+      // modelId: targetInstance.modelId, // Removed
       isActive: targetInstance.isActive,
       lastUsed: targetInstance.lastUsed,
       rateLimitResetAt: targetInstance.rateLimitResetAt,
@@ -44,13 +44,14 @@ export async function POST(request: NextRequest) {
     const name = formData.get("name") as string | null;
     const projectId = formData.get("projectId") as string | null;
     const location = formData.get("location") as string | null;
-    const modelId = formData.get("modelId") as string | null;
+    // const modelId = formData.get("modelId") as string | null; // Removed
     const dailyRateLimit = formData.get("dailyRateLimit") as string | null;
     const saKeyFile = formData.get("serviceAccountKeyJson") as File | null;
 
-    if (!name || !projectId || !location || !modelId || !saKeyFile) {
+    // Removed modelId check
+    if (!name || !projectId || !location || !saKeyFile) {
       return NextResponse.json(
-        { error: "Missing required fields: name, projectId, location, modelId, serviceAccountKeyJson file" },
+        { error: "Missing required fields: name, projectId, location, serviceAccountKeyJson file" },
         { status: 400 }
       );
     }
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
         name,
         projectId,
         location,
-        modelId,
+        // modelId, // Removed
         serviceAccountKeyJson,
         dailyRateLimit: validatedRateLimit
     });
@@ -105,9 +106,9 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     logError(error, { context: "POST /api/admin/targets" });
     // Check for specific duplicate key error if your DB driver provides it
-    if (error.message?.includes('duplicate key error')) { // Example check
+    if (error.message?.includes('duplicate key error')) { // Example check - Note: Duplicate check might need adjustment if based on removed fields
         return NextResponse.json(
-            { error: "A target with this combination of Project ID, Location, and Model ID might already exist." },
+            { error: "A target with this combination of Project ID and Location might already exist." }, // Adjusted error message
             { status: 409 } // Conflict
         );
     }

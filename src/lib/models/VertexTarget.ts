@@ -6,7 +6,7 @@ export interface VertexTargetData {
   _id: string;
   projectId: string;
   location: string;
-  modelId: string;
+  // modelId: string; // Removed
   serviceAccountKeyJson: string; // Store as JSON string
   name?: string | null; // Allow null from DB
   isActive: boolean;
@@ -35,7 +35,7 @@ export class VertexTarget implements VertexTargetData {
   _id: string;
   projectId: string;
   location: string;
-  modelId: string;
+  // modelId: string; // Removed
   serviceAccountKeyJson: string;
   name?: string | null;
   isActive: boolean;
@@ -52,7 +52,7 @@ export class VertexTarget implements VertexTargetData {
     this._id = data._id;
     this.projectId = data.projectId;
     this.location = data.location;
-    this.modelId = data.modelId;
+    // this.modelId = data.modelId; // Removed
     this.serviceAccountKeyJson = data.serviceAccountKeyJson;
     this.name = data.name;
     this.isActive = data.isActive; // Booleans are handled directly in the class
@@ -85,10 +85,7 @@ export class VertexTarget implements VertexTargetData {
         whereClause += ' AND location = ?';
         params.push(query.location);
     }
-    if (query.modelId !== undefined) {
-        whereClause += ' AND modelId = ?';
-        params.push(query.modelId);
-    }
+    // Removed modelId query
     if (query.isActive !== undefined) {
       whereClause += ' AND isActive = ?';
       params.push(booleanToDb(query.isActive));
@@ -163,15 +160,14 @@ export class VertexTarget implements VertexTargetData {
     // Validate required fields for VertexTarget
     if (!data.projectId) throw new Error("projectId cannot be empty");
     if (!data.location) throw new Error("location cannot be empty");
-    if (!data.modelId) throw new Error("modelId cannot be empty");
+    // Removed modelId validation
     if (!data.serviceAccountKeyJson) throw new Error("serviceAccountKeyJson cannot be empty");
-
 
     const targetData: VertexTargetData = {
       _id: newId,
       projectId: data.projectId,
       location: data.location,
-      modelId: data.modelId,
+      // modelId: data.modelId, // Removed
       serviceAccountKeyJson: data.serviceAccountKeyJson,
       name: data.name,
       isActive: data.isActive ?? true,
@@ -187,12 +183,12 @@ export class VertexTarget implements VertexTargetData {
 
     // Insert into the correct table
     await db.run(
-      `INSERT INTO vertex_targets (_id, projectId, location, modelId, serviceAccountKeyJson, name, isActive, lastUsed, rateLimitResetAt, failureCount, requestCount, dailyRateLimit, dailyRequestsUsed, lastResetDate, isDisabledByRateLimit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, // Changed table name
+      `INSERT INTO vertex_targets (_id, projectId, location, serviceAccountKeyJson, name, isActive, lastUsed, rateLimitResetAt, failureCount, requestCount, dailyRateLimit, dailyRequestsUsed, lastResetDate, isDisabledByRateLimit)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, // Removed modelId
       targetData._id,
       targetData.projectId,
       targetData.location,
-      targetData.modelId,
+      // targetData.modelId, // Removed
       targetData.serviceAccountKeyJson,
       targetData.name,
       booleanToDb(targetData.isActive),
@@ -215,11 +211,11 @@ export class VertexTarget implements VertexTargetData {
     // Update the correct table
     await db.run(
       `UPDATE vertex_targets
-       SET projectId = ?, location = ?, modelId = ?, serviceAccountKeyJson = ?, name = ?, isActive = ?, lastUsed = ?, rateLimitResetAt = ?, failureCount = ?, requestCount = ?, dailyRateLimit = ?, dailyRequestsUsed = ?, lastResetDate = ?, isDisabledByRateLimit = ?
-       WHERE _id = ?`, // Changed table name
+       SET projectId = ?, location = ?, serviceAccountKeyJson = ?, name = ?, isActive = ?, lastUsed = ?, rateLimitResetAt = ?, failureCount = ?, requestCount = ?, dailyRateLimit = ?, dailyRequestsUsed = ?, lastResetDate = ?, isDisabledByRateLimit = ?
+       WHERE _id = ?`, // Removed modelId
       this.projectId,
       this.location,
-      this.modelId,
+      // this.modelId, // Removed
       this.serviceAccountKeyJson,
       this.name,
       booleanToDb(this.isActive),
@@ -264,11 +260,11 @@ export class VertexTarget implements VertexTargetData {
         // Update the correct table
         await db.run(
           `UPDATE vertex_targets
-           SET projectId = ?, location = ?, modelId = ?, serviceAccountKeyJson = ?, name = ?, isActive = ?, lastUsed = ?, rateLimitResetAt = ?, failureCount = ?, requestCount = ?, dailyRateLimit = ?, dailyRequestsUsed = ?, lastResetDate = ?, isDisabledByRateLimit = ?
-           WHERE _id = ?`, // Changed table name
+           SET projectId = ?, location = ?, serviceAccountKeyJson = ?, name = ?, isActive = ?, lastUsed = ?, rateLimitResetAt = ?, failureCount = ?, requestCount = ?, dailyRateLimit = ?, dailyRequestsUsed = ?, lastResetDate = ?, isDisabledByRateLimit = ?
+           WHERE _id = ?`, // Removed modelId
           targetInstance.projectId,
           targetInstance.location,
-          targetInstance.modelId,
+          // targetInstance.modelId, // Removed
           targetInstance.serviceAccountKeyJson,
           targetInstance.name,
           booleanToDb(targetInstance.isActive),
