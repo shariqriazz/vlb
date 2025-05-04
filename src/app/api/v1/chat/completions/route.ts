@@ -304,11 +304,31 @@ function translateOpenAiToVertexContents(messages: { role: string; content: any 
                  currentContent = { role, parts };
                  contents.push(currentContent);
             } else {
-                // Standard consecutive role warning
-                requestLogger.warn(`Consecutive messages with the same role '${role}' detected. Vertex may expect alternating roles. Creating new content block.`);
-                // Create new content block instead of combining
-                currentContent = { role, parts };
-                contents.push(currentContent);
+                // Check if simple text merging is possible for consecutive 'user' roles
+                const canMergeText = role === 'user' &&
+                                   currentContent.parts.length === 1 && currentContent.parts[0].text &&
+                                   parts.length === 1 && parts[0].text;
+
+                if (canMergeText) {
+                     requestLogger.info(`Consecutive 'user' text messages detected. Merging content.`);
+                     // Merge text content with a newline separator
+                     // Ensure the previous part exists before appending
+                     if(currentContent.parts[0].text !== undefined && parts[0].text !== undefined) {
+                         currentContent.parts[0].text += `\n${parts[0].text}`;
+                     } else {
+                         // Fallback if text is somehow undefined (shouldn't happen with the check above)
+                         requestLogger.warn(`Could not merge consecutive user text messages due to undefined content.`);
+                         currentContent = { role, parts };
+                         contents.push(currentContent);
+                     }
+                     // Don't push a new content block, the existing one is updated
+                } else {
+                    // Standard consecutive role warning - still create new block if merging isn't straightforward
+                    requestLogger.warn(`Consecutive messages with the same role '${role}' detected. Cannot safely merge complex parts or non-user roles. Creating new content block as fallback.`);
+                    // Create new content block instead of merging complex parts
+                    currentContent = { role, parts };
+                    contents.push(currentContent);
+                }
             }
         } else {
             // If role changes or it's the first message, create a new content object
@@ -327,10 +347,11 @@ function translateOpenAiToVertexContents(messages: { role: string; content: any 
         const prevPartIsFunctionCall = contents[i-1].parts?.some((p: Part) => p.functionCall); // Use Part type
         const currentPartIsFunctionResponse = contents[i].parts?.some((p: Part) => p.functionResponse); // Use Part type
 
-        // Disallow user -> user (unless user is providing function response after model's function call)
-        if (currentRole === 'user' && prevRole === 'user' && !currentPartIsFunctionResponse) {
-            logError(new Error(`Consecutive 'user' messages detected. Vertex expects alternating roles.`), { context: "translateOpenAiToVertexContents" });
-        }
+        // Removed error log for consecutive 'user' roles as we attempt to merge them now.
+        // A warning is logged during processing if merging fails.
+        // if (currentRole === 'user' && prevRole === 'user' && !currentPartIsFunctionResponse) {
+        //     logError(new Error(`Consecutive 'user' messages detected. Vertex expects alternating roles.`), { context: "translateOpenAiToVertexContents" });
+        // }
         // Disallow model -> model
         if (currentRole === 'model' && prevRole === 'model') {
             logError(new Error(`Consecutive 'model' messages detected. Vertex expects alternating roles.`), { context: "translateOpenAiToVertexContents" });
