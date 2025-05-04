@@ -24,3 +24,4 @@ bun.lock
 package-lock.json
 # Roo files
 .roo/
+.rood/
