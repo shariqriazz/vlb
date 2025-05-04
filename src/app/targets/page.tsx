@@ -1,38 +1,34 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter for potential future use if needed
+import { Button } from "@/components/ui/button";
 import {
-  Box,
-  Heading,
-  Text,
-  Button,
-  useDisclosure,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  FormControl,
-  FormLabel,
-  Input,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose, // Import DialogClose if needed for explicit close button
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   Select,
-  InputGroup,
-  InputRightElement,
-  IconButton,
-  useToast,
-  Flex,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-} from '@chakra-ui/react';
-import { FiPlus, FiTarget, FiEdit } from 'react-icons/fi';
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast"; // Use shadcn's toast
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, Plus, Target, Edit, AlertCircle } from 'lucide-react'; // Use lucide-react icons
+
 import AppLayout from '@/components/layout/AppLayout';
-import TargetStats from '@/components/targets/TargetStats';
-import { locationOptions, modelIdOptions } from '@/lib/constants/vertexOptions';
+import TargetStats from '@/components/targets/TargetStats'; // Assuming this component is/will be refactored
+import { locationOptions } from '@/lib/constants/vertexOptions'; // Model options removed
 
 // Updated interface for VertexTarget
 interface VertexTarget {
@@ -40,8 +36,6 @@ interface VertexTarget {
   name?: string;
   projectId: string;
   location: string;
-  // modelId: string; // Removed
-  // serviceAccountKeyJson is not typically needed in the list view
   isActive: boolean;
   lastUsed: string | null;
   rateLimitResetAt: string | null;
@@ -53,109 +47,98 @@ interface VertexTarget {
   isDisabledByRateLimit: boolean;
 }
 
-export default function TargetsPage() { // Renamed component
-  const [targets, setTargets] = useState<VertexTarget[]>([]); // Renamed state variable and type
+export default function TargetsPage() {
+  const [targets, setTargets] = useState<VertexTarget[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false); // State for Dialog open/close
+
   // State for new target form fields
   const [newName, setNewName] = useState('');
   const [newProjectId, setNewProjectId] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [newLocationCustom, setNewLocationCustom] = useState('');
   const [isCustomLocation, setIsCustomLocation] = useState(false);
-  // Removed Model ID state
-  // const [newModelId, setNewModelId] = useState('');
-  // const [newModelIdCustom, setNewModelIdCustom] = useState('');
-  // const [isCustomModelId, setIsCustomModelId] = useState(false);
   const [newDailyRateLimit, setNewDailyRateLimit] = useState('');
-  const [newSaKeyFile, setNewSaKeyFile] = useState<File | null>(null); // State for file upload
+  const [newSaKeyFile, setNewSaKeyFile] = useState<File | null>(null);
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for resetting file input
 
-  const fetchTargets = async () => { // Renamed function
+  const fetchTargets = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/targets'); // Updated API endpoint
+      const response = await fetch('/api/admin/targets');
       if (!response.ok) {
-        throw new Error(`Error fetching targets: ${response.statusText}`); // Updated error message
+        throw new Error(`Error fetching targets: ${response.statusText}`);
       }
       const data = await response.json();
-      // Extract the 'targets' array from the response object
-      setTargets(data.targets || []); // Update state with targets array, fallback to empty array
+      setTargets(data.targets || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch Vertex targets'); // Updated error message
-      console.error('Error fetching targets:', err); // Updated log message
+      setError(err.message || 'Failed to fetch Vertex targets');
+      console.error('Error fetching targets:', err);
+       toast({
+         variant: "destructive",
+         title: "Error Fetching Targets",
+         description: err.message || 'Failed to fetch Vertex targets.',
+       });
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTargets(); // Call renamed function
+    fetchTargets();
   }, []);
 
-  const handleAddTarget = async () => { // Renamed function
-    // Get the actual location value (either from dropdown or custom input)
+  const handleAddTarget = async () => {
     const locationValue = isCustomLocation ? newLocationCustom.trim() : newLocation.trim();
-    // Removed modelIdValue
 
-    // Validation for required fields (removed modelIdValue)
     if (!newProjectId.trim() || !locationValue || !newSaKeyFile) {
       toast({
-        title: 'Error',
-        description: 'Project ID, Location, and Service Account Key file are required.', // Updated description
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        variant: "destructive",
+        title: 'Validation Error',
+        description: 'Project ID, Location, and Service Account Key file are required.',
       });
       return;
     }
 
-    // Create FormData object
     const formData = new FormData();
     formData.append('name', newName.trim());
     formData.append('projectId', newProjectId.trim());
     formData.append('location', locationValue);
-    // Removed formData.append('modelId', modelIdValue);
-    // Append rate limit only if it's a valid number, otherwise backend handles default (null)
+
     const rateLimitNum = parseInt(newDailyRateLimit.trim(), 10);
-    if (!isNaN(rateLimitNum) && rateLimitNum >= 0) {
-        formData.append('dailyRateLimit', String(rateLimitNum));
-    } else if (newDailyRateLimit.trim() === '') {
-        // Explicitly sending an empty string might be interpreted as null by backend if needed
-        // formData.append('dailyRateLimit', ''); // Or just don't append if backend defaults to null
+    if (newDailyRateLimit.trim() === '') {
+      // Append nothing or handle as null in backend
+    } else if (!isNaN(rateLimitNum) && rateLimitNum >= 0) {
+      formData.append('dailyRateLimit', String(rateLimitNum));
     } else {
-         toast({
-            title: 'Error',
-            description: 'Invalid Daily Rate Limit. Must be a non-negative number or empty.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-        });
-        return; // Stop submission if rate limit is invalid
+      toast({
+        variant: "destructive",
+        title: 'Validation Error',
+        description: 'Invalid Daily Rate Limit. Must be a non-negative number or empty.',
+      });
+      return;
     }
-    formData.append('serviceAccountKeyJson', newSaKeyFile); // Append the file
+
+    formData.append('serviceAccountKeyJson', newSaKeyFile);
 
     try {
-      const response = await fetch('/api/admin/targets', { // Updated API endpoint
+      const response = await fetch('/api/admin/targets', {
         method: 'POST',
-        body: formData, // Send FormData instead of JSON
-        // No 'Content-Type' header needed, browser sets it for FormData
+        body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add Vertex target'); // Updated error message
+        throw new Error(errorData.error || 'Failed to add Vertex target');
       }
 
       toast({
         title: 'Success',
-        description: 'Vertex target added successfully', // Updated success message
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+        description: 'Vertex target added successfully.',
       });
 
       // Reset form state
@@ -164,31 +147,24 @@ export default function TargetsPage() { // Renamed component
       setNewLocation('');
       setNewLocationCustom('');
       setIsCustomLocation(false);
-      // Removed Model ID reset
-      // setNewModelId('');
-      // setNewModelIdCustom('');
-      // setIsCustomModelId(false);
       setNewDailyRateLimit('');
       setNewSaKeyFile(null);
-      // Reset file input visually (optional, might need ref)
-      const fileInput = document.getElementById('sa-key-file-input') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''; // Reset file input
+      }
 
-
-      onClose();
+      setIsModalOpen(false); // Close modal
       fetchTargets(); // Refresh the list
     } catch (err: any) {
       toast({
-        title: 'Error',
-        description: err.message || 'Failed to add Vertex target', // Updated error message
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        variant: "destructive",
+        title: 'Error Adding Target',
+        description: err.message || 'Failed to add Vertex target.',
       });
     }
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setNewSaKeyFile(event.target.files[0]);
     } else {
@@ -196,144 +172,167 @@ export default function TargetsPage() { // Renamed component
     }
   };
 
-  // Handle location selection
-  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
+  // Handle location selection (using shadcn's onValueChange)
+  const handleLocationChange = (value: string) => {
     if (value === 'custom') {
       setIsCustomLocation(true);
-      setNewLocation('custom');
+      setNewLocation('custom'); // Keep track that custom was selected
     } else {
       setIsCustomLocation(false);
       setNewLocation(value);
+      setNewLocationCustom(''); // Clear custom input if a preset is chosen
     }
   };
 
-  // Removed handleModelIdChange
-
-
   return (
     <AppLayout>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Box>
-          <Heading size="lg">Vertex Targets</Heading> {/* Updated title */}
-          <Text color="gray.500">Manage your Vertex AI targets</Text> {/* Updated description */}
-        </Box>
-        <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={onOpen}>
-          Add New Target {/* Updated button text */}
-        </Button>
-      </Flex>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Vertex Targets</h1>
+          <p className="text-muted-foreground">Manage your Vertex AI targets</p>
+        </div>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" /> Add New Target
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px] md:max-w-[600px]"> {/* Adjusted width */}
+            <DialogHeader>
+              <DialogTitle>Add New Vertex Target</DialogTitle>
+              <DialogDescription>
+                Configure a new Vertex AI target endpoint. Ensure the Service Account has the 'Vertex AI User' role.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid items-center grid-cols-4 gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name (Optional)
+                </Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., Gemini Pro EU"
+                  value={newName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid items-center grid-cols-4 gap-4">
+                <Label htmlFor="projectId" className="text-right">
+                  Project ID <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="projectId"
+                  placeholder="your-gcp-project-id"
+                  value={newProjectId}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProjectId(e.target.value)}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid items-center grid-cols-4 gap-4">
+                <Label htmlFor="location" className="text-right">
+                  Location <span className="text-destructive">*</span>
+                </Label>
+                {!isCustomLocation ? (
+                   <Select
+                     value={newLocation}
+                     onValueChange={handleLocationChange} // Use onValueChange
+                   >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">Custom location...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                   <div className="flex items-center col-span-3 gap-2">
+                     <Input
+                       id="locationCustom"
+                       placeholder="Enter custom location (e.g., us-central1)"
+                       value={newLocationCustom}
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLocationCustom(e.target.value)}
+                       className="flex-grow"
+                     />
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => {
+                         setIsCustomLocation(false);
+                         setNewLocation(''); // Reset select value
+                       }}
+                     >
+                       Back
+                     </Button>
+                   </div>
+                )}
+              </div>
+               <div className="grid items-center grid-cols-4 gap-4">
+                 <Label htmlFor="sa-key-file-input" className="text-right">
+                   SA Key (JSON) <span className="text-destructive">*</span>
+                 </Label>
+                 <Input
+                   id="sa-key-file-input"
+                   ref={fileInputRef}
+                   type="file"
+                   accept=".json"
+                   onChange={handleFileChange}
+                   className="col-span-3"
+                 />
+              </div>
+               {newSaKeyFile && (
+                 <div className="grid items-center grid-cols-4 gap-4">
+                   <div className="col-span-3 col-start-2">
+                      <p className="text-sm text-muted-foreground">Selected: {newSaKeyFile.name}</p>
+                   </div>
+                 </div>
+                )}
+              <div className="grid items-center grid-cols-4 gap-4">
+                <Label htmlFor="dailyRateLimit" className="text-right">
+                  Daily Rate Limit
+                </Label>
+                <Input
+                  id="dailyRateLimit"
+                  type="number"
+                  placeholder="e.g., 1000 (empty for none)"
+                  value={newDailyRateLimit}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDailyRateLimit(e.target.value)}
+                  min="0"
+                  className="col-span-3"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                 <Button variant="ghost">Cancel</Button>
+              </DialogClose>
+              <Button onClick={handleAddTarget}>Add Target</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {error && (
-        <Alert status="error" mb={6} borderRadius="md">
-          <AlertIcon />
-          <AlertTitle>Error!</AlertTitle>
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="w-4 h-4" />
+          <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {isLoading ? (
-        <Flex justify="center" align="center" h="200px">
-          <Spinner size="xl" color="blue.500" />
-        </Flex>
+        <div className="flex items-center justify-center h-48"> {/* Increased height */}
+          <Loader2 className="w-8 h-8 animate-spin text-primary" /> {/* Larger spinner */}
+        </div>
       ) : (
-        // Use TargetStats component - Assuming it's adapted to display target data
-        <TargetStats targets={targets} fetchTargets={fetchTargets} isLoading={isLoading} /> // Pass isLoading prop
+        // Assuming TargetStats is refactored or compatible
+        <TargetStats targets={targets} fetchTargets={fetchTargets} isLoading={isLoading} />
       )}
-
-      {/* Add Target Modal */}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Add New Vertex Target</ModalHeader> {/* Updated modal title */}
-          <ModalCloseButton />
-          <ModalBody pb={6}> {/* Add padding bottom */}
-             <FormControl mb={4}> {/* Name input */}
-              <FormLabel>Target Name (Optional)</FormLabel>
-              <Input
-                placeholder="e.g., Gemini Pro EU"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-            </FormControl>
-             <FormControl isRequired mb={4}>
-              <FormLabel>Project ID</FormLabel>
-              <Input
-                placeholder="your-gcp-project-id"
-                value={newProjectId}
-                onChange={(e) => setNewProjectId(e.target.value)}
-              />
-            </FormControl>
-             <FormControl isRequired mb={4}>
-              <FormLabel>Location</FormLabel>
-              {!isCustomLocation ? (
-                <Select
-                  placeholder="Select location"
-                  value={newLocation}
-                  onChange={handleLocationChange}
-                >
-                  {locationOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                  <option value="custom">Custom location...</option>
-                </Select>
-              ) : (
-                <InputGroup>
-                  <Input
-                    placeholder="Enter custom location (e.g., us-central1)"
-                    value={newLocationCustom}
-                    onChange={(e) => setNewLocationCustom(e.target.value)}
-                  />
-                  <InputRightElement width="4.5rem">
-                    <Button
-                      h="1.75rem"
-                      size="sm"
-                      onClick={() => {
-                        setIsCustomLocation(false);
-                        setNewLocation('');
-                      }}
-                    >
-                      Back
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
-              )}
-            </FormControl>
-            {/* Removed Model ID FormControl */}
-             <FormControl isRequired mb={4}>
-              <FormLabel>Service Account Key (JSON)</FormLabel>
-              <Input
-                id="sa-key-file-input" // Added ID for potential reset
-                type="file"
-                accept=".json"
-                onChange={handleFileChange}
-                p={1} // Add some padding for file input
-              />
-              {newSaKeyFile && <Text fontSize="sm" mt={1} color="gray.600">Selected: {newSaKeyFile.name}</Text>}
-            </FormControl>
-            <FormControl> {/* Daily Rate Limit input */}
-              <FormLabel>Daily Rate Limit (Optional)</FormLabel>
-              <Input
-                type="number"
-                placeholder="e.g., 1000 (leave empty for no limit)"
-                value={newDailyRateLimit}
-                onChange={(e) => setNewDailyRateLimit(e.target.value)}
-                min="0"
-              />
-            </FormControl>
-          </ModalBody>
-
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="blue" onClick={handleAddTarget}> {/* Call renamed handler */}
-              Add Target {/* Updated button text */}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </AppLayout>
   );
 }

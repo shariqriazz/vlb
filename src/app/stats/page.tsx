@@ -1,39 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react"; // Added useMemo
+import { useState, useEffect, useMemo } from "react";
 import { format, parseISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz'; // Corrected function name based on TS error
-import {
-  Box,
-  Heading,
-  Text,
-  Flex,
-  Select,
-  FormControl,
-  Card,
-  CardHeader,
-  CardBody,
-  Divider,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  useColorModeValue,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  SimpleGrid,
-  useToast,
-  IconButton,
-  Tooltip,
-} from "@chakra-ui/react";
+import { toZonedTime } from 'date-fns-tz';
 import {
   LineChart,
   Line,
@@ -42,29 +11,76 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip as RechartsTooltip,
+  Tooltip as RechartsTooltip, // Keep recharts tooltip for specific overrides if needed later
   Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
 } from "recharts";
-import { FiRefreshCw } from "react-icons/fi";
+import { RefreshCw, AlertTriangle, Info, Loader2 } from "lucide-react";
+
 import AppLayout from "@/components/layout/AppLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast"; // Use shadcn toast
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
 
 // --- Timezone Formatting Helper ---
-const formatInTimeZone = (dateInput: string | Date, tz: string, fmt: string): string => {
+const formatInTimeZone = (dateInput: string | Date | undefined | null, tz: string, fmt: string): string => {
+  if (!dateInput) return 'Invalid Date';
   try {
     const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
-    const zonedDate = toZonedTime(date, tz); // Corrected function name based on TS error
+    if (isNaN(date.getTime())) { // Check if date is valid
+        return 'Invalid Date';
+    }
+    const zonedDate = toZonedTime(date, tz);
     return format(zonedDate, fmt);
   } catch (e) {
-    console.error("Error formatting date:", e);
-    // Fallback to ISO string part if formatting fails
-    return typeof dateInput === 'string' ? dateInput.substring(0, 10) : 'Invalid Date';
+    console.error("Error formatting date:", e, "Input:", dateInput);
+    // Fallback to ISO string part or fixed text if formatting fails
+    if (typeof dateInput === 'string') {
+        // Basic check if it looks like an ISO string
+        return dateInput.length > 10 ? dateInput.substring(0, 10) : 'Invalid Date';
+    }
+    return 'Invalid Date';
   }
 };
 // --- End Timezone Formatting Helper ---
+
+// Interface for Pie Chart data entries
+interface PieChartEntry {
+  name: string;
+  value: number;
+  fill: string;
+  isActive?: boolean; // Optional for target usage
+  opacity?: number; // Optional for target usage
+}
+
+// --- Chart Config --- (Using CSS variables defined in globals.css)
+const chartConfig = {
+  requests: { label: "Requests", color: "hsl(var(--chart-1))" },
+  errors: { label: "Errors", color: "hsl(var(--chart-2))" }, // Use chart-2 for errors
+  targetErrors: { label: "Target Errors", color: "hsl(var(--chart-3))" }, // Use chart-3 for target errors
+  modelUsage: { label: "Models", color: "hsl(var(--chart-4))" },
+  targetUsage: { label: "Targets", color: "hsl(var(--chart-5))" },
+} satisfies Record<string, { label: string; color: string }>;
+
+// Colors for pie charts (fallback if CSS vars aren't enough)
+const PIE_COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+    "#82CA9D", // Example fallback color
+];
+// --- End Chart Config ---
 
 
 export default function StatsPage() {
@@ -72,24 +88,8 @@ export default function StatsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
-  const [userTimeZone, setUserTimeZone] = useState<string>('UTC'); // State for user timezone, default UTC
-
-  const cardBg = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.200", "gray.700");
-  const lineColor = useColorModeValue("#3182CE", "#63B3ED");
-  const errorColor = useColorModeValue("#E53E3E", "#FC8181");
-  const toast = useToast();
-  const axisTickColor = useColorModeValue("gray.700", "#FFFFFF");
-
-  // Colors for pie charts
-  const COLORS = [
-    "#0088FE",
-    "#00C49F",
-    "#FFBB28",
-    "#FF8042",
-    "#8884D8",
-    "#82CA9D",
-  ];
+  const [userTimeZone, setUserTimeZone] = useState<string>('UTC');
+  const { toast } = useToast(); // shadcn toast
 
   const fetchStats = async () => {
     setIsLoading(true);
@@ -98,19 +98,19 @@ export default function StatsPage() {
     try {
       const response = await fetch(`/api/stats?timeRange=${timeRange}`);
       if (!response.ok) {
-        throw new Error(`Error fetching statistics: ${response.statusText}`);
+        const errorData = await response.text(); // Get more details
+        throw new Error(`Error fetching statistics (${response.status}): ${errorData || response.statusText}`);
       }
       const data = await response.json();
       setStats(data);
     } catch (err: any) {
-      setError(err.message || "Failed to fetch statistics");
+      const errorMessage = err.message || "Failed to fetch statistics";
+      setError(errorMessage);
       console.error("Error fetching stats:", err);
       toast({
-        title: "Error",
-        description: err.message || "Failed to fetch statistics",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
+        title: "Error Fetching Stats",
+        description: errorMessage,
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -118,435 +118,408 @@ export default function StatsPage() {
   };
 
   useEffect(() => {
-    // Get user's timezone on component mount
     setUserTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
     fetchStats();
-  }, [timeRange]); // fetchStats dependency removed as it causes infinite loop if not memoized
-
-  // Custom tooltip formatter for charts
-  const formatTooltipValue = (value: number) => {
-    return value.toLocaleString();
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRange]); // Keep timeRange dependency
 
   // Format percentage for display
-  const formatPercentage = (value: number) => {
+  const formatPercentage = (value: number | undefined | null): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return "N/A";
+    }
     return `${value.toFixed(1)}%`;
   };
+
+  const formatNumber = (value: number | undefined | null): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return "N/A";
+    }
+    return value.toLocaleString();
+  }
 
   // --- Memoized Formatted Data ---
   const formattedRequestData = useMemo(() => {
     if (!stats?.requestData) return [];
-    const formatString = timeRange === '24h' ? 'HH:mm' : 'yyyy-MM-dd';
+    const formatString = timeRange === '24h' ? 'HH:mm' : 'MM-dd'; // Use MM-dd for clarity
     return stats.requestData.map((item: any) => ({
       ...item,
-      localTimeLabel: formatInTimeZone(item.name, userTimeZone, formatString), // Use original 'name' (date string)
-      originalUtcTime: item.name // Keep original UTC time if needed for tooltip
+      date: formatInTimeZone(item.name, userTimeZone, formatString), // Use 'date' as key for XAxis
+      requests: item.requests ?? 0,
+      errors: item.errors ?? 0,
+      targetErrors: item.targetErrors ?? 0,
     }));
   }, [stats?.requestData, userTimeZone, timeRange]);
 
   const formattedHourlyData = useMemo(() => {
     if (!stats?.hourlyData) return [];
-    return stats.hourlyData.map((item: any) => ({
+    // Ensure data is sorted by hour for correct chart display
+    const sortedData = [...stats.hourlyData].sort((a, b) => {
+        try {
+            return parseISO(a.hour).getTime() - parseISO(b.hour).getTime();
+        } catch {
+            return 0; // Handle potential invalid date strings
+        }
+    });
+    return sortedData.map((item: any) => ({
       ...item,
-      localTimeLabel: formatInTimeZone(item.hour, userTimeZone, 'HH:mm'), // Use 'hour' (ISO string)
-      originalUtcTime: item.hour // Keep original UTC time if needed for tooltip
+      hour: formatInTimeZone(item.hour, userTimeZone, 'HH:mm'), // Use 'hour' as key for XAxis
+      requests: item.requests ?? 0,
     }));
   }, [stats?.hourlyData, userTimeZone]);
+
+  const targetUsageData = useMemo(() => {
+    return stats?.targetUsageData?.map((item: any, index: number) => ({
+        ...item,
+        fill: PIE_COLORS[index % PIE_COLORS.length],
+        opacity: item.isActive ? 1 : 0.5, // Keep opacity logic
+    })) || [];
+  }, [stats?.targetUsageData]);
+
+  const modelUsageData = useMemo(() => {
+     return stats?.modelUsageData?.map((item: any, index: number) => ({
+        ...item,
+        fill: PIE_COLORS[index % PIE_COLORS.length],
+     })) || [];
+  }, [stats?.modelUsageData]);
   // --- End Memoized Formatted Data ---
 
 
+  const renderLoading = () => (
+      <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Loading statistics...</p>
+      </div>
+  );
+
+  const renderError = () => (
+       <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="w-4 h-4" />
+          <AlertTitle>Error Fetching Statistics</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+       </Alert>
+  );
+
+  const renderNoData = () => (
+       <Alert className="mb-6">
+          <Info className="w-4 h-4" />
+          <AlertTitle>No Data Available</AlertTitle>
+          <AlertDescription>
+            No statistics found for the selected period. Try changing the time range or refreshing.
+          </AlertDescription>
+       </Alert>
+  );
+
   return (
     <AppLayout>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Box>
-          <Heading size="lg">Usage Statistics</Heading>
-          <Text color="gray.500">Monitor your API usage</Text>
-        </Box>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Usage Statistics</h1>
+          <p className="text-sm text-muted-foreground">Monitor your API usage</p>
+        </div>
 
-        <Flex gap={2} align="center">
-          <FormControl w="200px">
-            <Select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-            >
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="90d">Last 90 Days</option>
-            </Select>
-          </FormControl>
-          <Tooltip label="Refresh Statistics">
-            <IconButton
-              aria-label="Refresh statistics"
-              icon={<FiRefreshCw />}
-              onClick={fetchStats}
-              isLoading={isLoading}
-            />
-          </Tooltip>
-        </Flex>
-      </Flex>
+        <div className="flex items-center gap-2">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select time range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24h">Last 24 Hours</SelectItem>
+              <SelectItem value="7d">Last 7 Days</SelectItem>
+              <SelectItem value="30d">Last 30 Days</SelectItem>
+              <SelectItem value="90d">Last 90 Days</SelectItem>
+            </SelectContent>
+          </Select>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={fetchStats} disabled={isLoading}>
+                  <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                  <span className="sr-only">Refresh statistics</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Refresh Statistics</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
 
-      {error && (
-        <Alert status="error" mb={6} borderRadius="md">
-          <AlertIcon />
-          <AlertTitle>Error!</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {error && renderError()}
 
-      {isLoading ? (
-        <Flex justify="center" align="center" h="400px">
-          <Spinner size="xl" color="blue.500" />
-        </Flex>
-      ) : stats ? (
+      {isLoading ? renderLoading() : !stats ? renderNoData() : (
         <>
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={6}>
-            <Card
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="lg"
-              shadow="sm"
-            >
-              <CardBody>
-                <Stat>
-                  <StatLabel>Total Requests</StatLabel>
-                  <StatNumber>
-                    {stats.totalRequests.toLocaleString()}
-                  </StatNumber>
-                  <StatHelpText>Lifetime total</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
+          {/* Stats Summary Cards */}
+          <div className="grid gap-4 mb-6 md:grid-cols-2 lg:grid-cols-4">
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
+                  {/* Optional: Add an icon here */}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatNumber(stats.totalRequests)}</div>
+                  <p className="text-xs text-muted-foreground">Lifetime total</p>
+                </CardContent>
+              </Card>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+                   {/* Optional: Add an icon here */}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatPercentage(stats.successRate)}</div>
+                  <p className="text-xs text-muted-foreground">In selected period</p>
+                </CardContent>
+              </Card>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
+                  {/* Optional: Add an icon here */}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.avgResponseTime !== null && stats.avgResponseTime !== undefined ? `${Math.round(stats.avgResponseTime)}ms` : 'N/A'}</div>
+                  <p className="text-xs text-muted-foreground">Across successful requests</p>
+                </CardContent>
+              </Card>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">Active Targets</CardTitle>
+                  {/* Optional: Add an icon here */}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatNumber(stats.activeTargets)}</div>
+                  <p className="text-xs text-muted-foreground">Currently in rotation</p>
+                </CardContent>
+              </Card>
+          </div>
 
-            <Card
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="lg"
-              shadow="sm"
-            >
-              <CardBody>
-                <Stat>
-                  <StatLabel>Success Rate</StatLabel>
-                  <StatNumber>
-                    {formatPercentage(stats.successRate)}
-                  </StatNumber>
-                  <StatHelpText>In selected period</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
+          {/* Tabs for Charts */}
+           <Tabs defaultValue="volume" className="mb-6">
+            <TabsList>
+              <TabsTrigger value="volume">Request Volume</TabsTrigger>
+              <TabsTrigger value="target-usage">Target Usage</TabsTrigger>
+              <TabsTrigger value="model-usage">Model Usage</TabsTrigger>
+              <TabsTrigger value="hourly">Hourly Breakdown</TabsTrigger>
+            </TabsList>
 
-            <Card
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="lg"
-              shadow="sm"
-            >
-              <CardBody>
-                <Stat>
-                  <StatLabel>Avg Response Time</StatLabel>
-                  <StatNumber>{Math.round(stats.avgResponseTime)}ms</StatNumber>
-                  <StatHelpText>Across successful requests</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-
-            <Card
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="lg"
-              shadow="sm"
-            >
-              <CardBody>
-                <Stat>
-                  <StatLabel>Active Targets</StatLabel>
-                  <StatNumber>{stats.activeTargets}</StatNumber>
-                  <StatHelpText>Currently in rotation</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-          </SimpleGrid>
-
-          <Tabs variant="enclosed" colorScheme="blue" mb={6}>
-            <TabList>
-              <Tab>Request Volume</Tab>
-              <Tab>Target Usage</Tab>
-              <Tab>Model Usage</Tab>
-              <Tab>Hourly Breakdown</Tab>
-            </TabList>
-
-            <TabPanels>
-              <TabPanel p={0} pt={4}>
-                <Card
-                  bg={cardBg}
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  borderRadius="lg"
-                  shadow="sm"
-                >
-                  <CardHeader>
-                    <Heading size="md">Request Volume Over Time</Heading>
-                  </CardHeader>
-                  <Divider />
-                  <CardBody>
-                    <Box h="400px">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={formattedRequestData} // Use formatted data
-                          margin={{
-                            top: 5,
-                            right: 30,
-                            left: 20,
-                            bottom: 25, // Reverted bottom margin
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis
-                            dataKey="localTimeLabel" // Use formatted label
-                            tick={{ fill: axisTickColor }}
-                            angle={-45}
-                            textAnchor="end"
-                            height={100} // Increased XAxis height
-                          />
-                          <YAxis tick={{ fill: axisTickColor }} />
-                          <RechartsTooltip
-                            formatter={(value: number, name: string, props: any) => {
-                                // Display local time in tooltip label if available
-                                const label = props.payload?.localTimeLabel || props.label;
-                                return [formatTooltipValue(value), name, label];
+            {/* Request Volume Tab */}
+            <TabsContent value="volume" className="pt-4">
+               <Card>
+                <CardHeader>
+                  <CardTitle>Request Volume Over Time</CardTitle>
+                  <CardDescription>Requests vs Errors ({timeRange})</CardDescription>
+                </CardHeader>
+                <CardContent className="pb-4">
+                  <div className=""> {/* Removed h-[400px] */}
+                    <ChartContainer config={chartConfig}>
+                        <ResponsiveContainer width="100%" height={150}>
+                          <LineChart
+                            data={formattedRequestData}
+                            margin={{
+                              top: 5,
+                              right: 10, // Adjusted margins
+                              left: 10,
+                              bottom: 40, // Increased bottom margin for angled labels
                             }}
-                            labelFormatter={(label: string, payload: any[]) => {
-                                // Attempt to show local time as the main label in tooltip
-                                const entry = payload?.[0]?.payload;
-                                return entry?.localTimeLabel || label;
-                            }}
-                            contentStyle={{
-                              backgroundColor: cardBg,
-                              borderColor: borderColor,
-                            }}
-                          />
-                          <Legend />
-                          <Line
-                            type="monotone"
-                            dataKey="requests"
-                            name="Requests"
-                            stroke={lineColor}
-                            activeDot={{ r: 8 }}
-                            strokeWidth={2}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="errors"
-                            name="Errors"
-                            stroke={errorColor}
-                            strokeWidth={2}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="targetErrors"
-                            name="Target Errors"
-                            stroke="#FF8C00"
-                            strokeWidth={2}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </Box>
-                  </CardBody>
-                </Card>
-              </TabPanel>
-
-              <TabPanel p={0} pt={4}>
-                <Card
-                  bg={cardBg}
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  borderRadius="lg"
-                  shadow="sm"
-                >
-                  <CardHeader>
-                    <Heading size="md">Target Usage Distribution</Heading>
-                  </CardHeader>
-                  <Divider />
-                  <CardBody>
-                    <Box h="400px">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={stats.targetUsageData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={true}
-                            outerRadius={150}
-                            fill="#8884d8"
-                            dataKey="value"
-                            nameKey="name"
-                            label={({ name, percent }) =>
-                              `${name}: ${(percent * 100).toFixed(1)}%`
-                            }
                           >
-                            {stats.targetUsageData.map(
-                              (entry: any, index: number) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={COLORS[index % COLORS.length]}
-                                  opacity={entry.isActive ? 1 : 0.5}
-                                />
-                              )
-                            )}
-                          </Pie>
-                          <RechartsTooltip
-                            formatter={(value: number, name: string) => [
-                              value.toLocaleString(),
-                              name,
-                            ]}
-                            contentStyle={{
-                              backgroundColor: cardBg,
-                              borderColor: borderColor,
-                            }}
-                          />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </Box>
-                  </CardBody>
-                </Card>
-              </TabPanel>
-
-              <TabPanel p={0} pt={4}>
-                <Card
-                  bg={cardBg}
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  borderRadius="lg"
-                  shadow="sm"
-                >
-                  <CardHeader>
-                    <Heading size="md">Model Usage Distribution</Heading>
-                  </CardHeader>
-                  <Divider />
-                  <CardBody>
-                    {stats.modelUsageData.length > 0 ? (
-                      <Box h="400px">
-                        <ResponsiveContainer width="100%" height="100%">
-                           <PieChart>
-                             <Pie
-                               data={stats.modelUsageData}
-                               cx="50%"
-                               cy="50%"
-                               labelLine={true}
-                               outerRadius={150}
-                               fill="#8884d8"
-                               dataKey="value"
-                               nameKey="name"
-                               label={({ name, percent }) =>
-                                 `${name}: ${(percent * 100).toFixed(1)}%`
-                               }
-                             >
-                               {stats.modelUsageData.map(
-                                 (entry: any, index: number) => (
-                                   <Cell
-                                     key={`cell-${index}`}
-                                     fill={COLORS[index % COLORS.length]}
-                                   />
-                                 )
-                               )}
-                             </Pie>
-                             <RechartsTooltip
-                               formatter={(value: number, name: string) => [
-                                 value.toLocaleString(),
-                                 name,
-                               ]}
-                               contentStyle={{
-                                 backgroundColor: cardBg,
-                                 borderColor: borderColor,
-                               }}
-                             />
-                             <Legend />
-                           </PieChart>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={8}
+                              angle={-45}
+                              textAnchor="end"
+                              tickFormatter={(value) => value} // Already formatted
+                            />
+                            <YAxis
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                            />
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent indicator="line" />}
+                            />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            <Line
+                              dataKey="requests"
+                              type="monotone"
+                              stroke={chartConfig.requests.color}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                            <Line
+                              dataKey="errors"
+                              type="monotone"
+                              stroke={chartConfig.errors.color}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                             <Line
+                              dataKey="targetErrors"
+                              type="monotone"
+                              stroke={chartConfig.targetErrors.color}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          </LineChart>
                         </ResponsiveContainer>
-                      </Box>
-                    ) : (
-                      <Text>No model usage data available for this period.</Text>
-                    )}
-                  </CardBody>
-                </Card>
-              </TabPanel>
+                    </ChartContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <TabPanel p={0} pt={4}>
-                <Card
-                  bg={cardBg}
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  borderRadius="lg"
-                  shadow="sm"
-                >
-                  <CardHeader>
-                    <Heading size="md">Hourly Request Volume (Last 24h)</Heading>
-                  </CardHeader>
-                  <Divider />
-                  <CardBody>
-                    <Box h="400px">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={formattedHourlyData} // Use formatted data
-                          margin={{
-                            top: 5,
-                            right: 30,
-                            left: 20,
-                            bottom: 25, // Reverted bottom margin
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis
-                            dataKey="localTimeLabel" // Use formatted label
-                            tick={{ fill: axisTickColor }}
-                            angle={-45}
-                            textAnchor="end"
-                            height={100} // Increased XAxis height
-                          />
-                          <YAxis tick={{ fill: axisTickColor }} />
-                          <RechartsTooltip
-                            formatter={(value: number, name: string, props: any) => {
-                                // Display local time in tooltip label if available
-                                const label = props.payload?.localTimeLabel || props.label;
-                                return [formatTooltipValue(value), name, label];
+            {/* Target Usage Tab */}
+            <TabsContent value="target-usage" className="pt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Target Usage Distribution</CardTitle>
+                  <CardDescription>Distribution of requests across targets ({timeRange})</CardDescription>
+                </CardHeader>
+                 <CardContent className="pb-4">
+                   <div className=""> {/* Removed h-[400px] */}
+                     <ChartContainer config={chartConfig}>
+                        <ResponsiveContainer width="100%" height={150}>
+                          <PieChart>
+                             <ChartTooltip
+                                content={<ChartTooltipContent nameKey="value" hideLabel />} // Show value, hide generic label
+                             />
+                             <Pie
+                                data={targetUsageData}
+                                dataKey="value"
+                                nameKey="name" // Use target name
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={150}
+                                label={({ name, percent }) =>
+                                  `${name}: ${(percent * 100).toFixed(1)}%`
+                                }
+                                labelLine={true}
+                              >
+                                {targetUsageData.map((entry: PieChartEntry, index: number) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.fill} // Use pre-calculated fill
+                                        opacity={entry.opacity}
+                                        className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Accessibility
+                                    />
+                                ))}
+                             </Pie>
+                            <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                          </PieChart>
+                         </ResponsiveContainer>
+                     </ChartContainer>
+                   </div>
+                 </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Model Usage Tab */}
+            <TabsContent value="model-usage" className="pt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Model Usage Distribution</CardTitle>
+                  <CardDescription>Distribution of requests across models ({timeRange})</CardDescription>
+                </CardHeader>
+                <CardContent className="pb-4">
+                 {modelUsageData.length > 0 ? (
+                   <div className=""> {/* Removed h-[400px] */}
+                     <ChartContainer config={chartConfig}>
+                        <ResponsiveContainer width="100%" height={150}>
+                          <PieChart>
+                            <ChartTooltip
+                                content={<ChartTooltipContent nameKey="value" hideLabel />}
+                             />
+                             <Pie
+                                data={modelUsageData}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={150}
+                                label={({ name, percent }) =>
+                                  `${name}: ${(percent * 100).toFixed(1)}%`
+                                }
+                                labelLine={true}
+                              >
+                                {modelUsageData.map((entry: PieChartEntry, index: number) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.fill}
+                                        className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    />
+                                ))}
+                             </Pie>
+                             <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+                          </PieChart>
+                         </ResponsiveContainer>
+                      </ChartContainer>
+                   </div>
+                  ) : (
+                      <p className="text-sm text-muted-foreground">No model usage data available for this period.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+             {/* Hourly Breakdown Tab */}
+            <TabsContent value="hourly" className="pt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Hourly Request Volume</CardTitle>
+                   <CardDescription>Requests per hour (Last 24h, {userTimeZone} Time)</CardDescription>
+                </CardHeader>
+                <CardContent className="pb-4">
+                  <div className=""> {/* Removed h-[400px] */}
+                    <ChartContainer config={chartConfig}>
+                       <ResponsiveContainer width="100%" height={150}>
+                         <BarChart
+                           data={formattedHourlyData}
+                            margin={{
+                              top: 5,
+                              right: 10,
+                              left: 10,
+                              bottom: 40, // Increased bottom margin
                             }}
-                             labelFormatter={(label: string, payload: any[]) => {
-                                // Attempt to show local time as the main label in tooltip
-                                const entry = payload?.[0]?.payload;
-                                return entry?.localTimeLabel || label;
-                            }}
-                            contentStyle={{
-                              backgroundColor: cardBg,
-                              borderColor: borderColor,
-                            }}
-                          />
-                          <Legend />
-                          <Bar
-                            dataKey="requests"
-                            name="Requests"
-                            fill="#3182CE"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </Box>
-                  </CardBody>
-                </Card>
-              </TabPanel>
-            </TabPanels>
+                          >
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="hour"
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={8}
+                              angle={-45}
+                              textAnchor="end"
+                              tickFormatter={(value) => value} // Already formatted
+                            />
+                             <YAxis
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                            />
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent indicator="line" />}
+                            />
+                             <ChartLegend content={<ChartLegendContent />} />
+                            <Bar
+                              dataKey="requests"
+                              name="Requests" // Added name for legend/tooltip
+                              fill={chartConfig.requests.color}
+                              radius={4} // Optional: adds rounded corners
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                    </ChartContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </>
-      ) : (
-        <Alert status="info" mb={6} borderRadius="md">
-          <AlertIcon />
-          <AlertTitle>No Data</AlertTitle>
-          <AlertDescription>
-            No statistics available. Try changing the time range or refreshing.
-          </AlertDescription>
-        </Alert>
       )}
     </AppLayout>
   );

@@ -28,11 +28,11 @@ Thanks to @SannidhyaSah for the original OpenAI-compatible load balancer foundat
 
 The Vertex AI Load Balancer is built using Next.js App Router, providing a unified application for the frontend UI and backend API routes.
 
-- **Frontend**: React with Chakra UI and Tailwind CSS for a responsive and accessible interface.
+- **Frontend**: React with shadcn/ui and Tailwind CSS for a responsive and accessible interface.
 - **Backend**: Next.js API routes that proxy requests to the appropriate Google Cloud Vertex AI endpoint based on the selected target. Uses `@google-cloud/vertexai`.
 - **State Management**: React Context API + SWR for data fetching.
 - **Data Storage**: SQLite database (`data/database.db`) for Vertex AI targets (`vertex_targets` table), application settings, and detailed request logs (`request_logs` table including token counts). File-based storage (`logs/`) for supplementary debugging logs (requests, errors, target events). Statistics are derived from the database.
-- **Styling**: Chakra UI with Tailwind CSS.
+- **Styling**: shadcn/ui with Tailwind CSS.
 - **Error Handling**: Comprehensive error logging and monitoring.
 - **Type Safety**: Full TypeScript implementation.
 
@@ -302,7 +302,7 @@ vertex-ai-load-balancer/
 ### Technology Stack
 
 - **Framework**: Next.js 14+ (App Router)
-- **UI Library**: Chakra UI with Tailwind CSS
+- **UI Library**: shadcn/ui with Tailwind CSS
 - **State Management**: React Context API + SWR for data fetching
 - **API Communication**: Built-in Next.js API routes + `@google-cloud/vertexai` for Vertex AI calls
 - **Charts**: Recharts
@@ -311,7 +311,7 @@ vertex-ai-load-balancer/
 - **Concurrency**: `async-mutex`
 - **Logging**: `winston`, `winston-daily-rotate-file`
 - **Package Manager**: Bun (Recommended)
-- **Styling**: Chakra UI + Tailwind CSS
+- **Styling**: shadcn/ui + Tailwind CSS
 - **Icons**: React Icons
 - **Language**: TypeScript
 
