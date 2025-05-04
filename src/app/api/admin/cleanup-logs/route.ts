@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { readSettings } from '@/lib/settings'; // Import readSettings from lib
-import { logError, logKeyEvent } from '@/lib/services/logger'; // Use logKeyEvent for now
+import { logError, logTargetEvent } from '@/lib/services/logger'; // Use logTargetEvent for admin/target events
 import { getDb } from '@/lib/db'; // Import getDb for database operations
 
 // Function to parse date from log filename (similar to stats route)
@@ -18,12 +18,12 @@ function parseDateFromFilename(filename: string): Date | null {
 
 export async function POST() { // Use POST for actions with side effects
   try {
-    logKeyEvent('Admin Action', { action: 'Log cleanup started' });
+    logTargetEvent('Admin Action', { action: 'Log cleanup started' });
     const settings = await readSettings();
     const retentionDays = settings.logRetentionDays;
 
     if (retentionDays <= 0) {
-      logKeyEvent('Admin Action', { action: 'Log cleanup skipped', reason: 'Retention days set to 0 or less.' });
+      logTargetEvent('Admin Action', { action: 'Log cleanup skipped', reason: 'Retention days set to 0 or less.' });
       return NextResponse.json({ message: 'Log retention is disabled (retention days <= 0). No files deleted.' });
     }
 
@@ -49,7 +49,7 @@ export async function POST() { // Use POST for actions with side effects
       );
 
       deletedDbLogCount = result.changes || 0;
-      logKeyEvent('Admin Action', {
+      logTargetEvent('Admin Action', {
         action: 'Deleted old database logs',
         count: deletedDbLogCount,
         cutoffDate: cutoffDateISO
@@ -68,7 +68,7 @@ export async function POST() { // Use POST for actions with side effects
       files = await fs.readdir(logsDir);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        logKeyEvent('Admin Action', { action: 'File log cleanup skipped', reason: 'Logs directory does not exist.' });
+        logTargetEvent('Admin Action', { action: 'File log cleanup skipped', reason: 'Logs directory does not exist.' });
         // Continue with the process since we might have cleaned up database logs
       } else {
         const errorMessage = `Failed to read logs directory: ${error.message}`;
@@ -94,7 +94,7 @@ export async function POST() { // Use POST for actions with side effects
         try {
           await fs.unlink(filePath);
           deletedFileCount++;
-          logKeyEvent('Admin Action', { action: 'Deleted old log file', file: file });
+          logTargetEvent('Admin Action', { action: 'Deleted old log file', file: file });
         } catch (error: any) {
           const errorMessage = `Failed to delete log file ${file}: ${error.message}`;
           logError(error, { context: 'Log Cleanup - Files', file: file });
@@ -116,7 +116,7 @@ export async function POST() { // Use POST for actions with side effects
       errors,
     };
 
-    logKeyEvent('Admin Action', {
+    logTargetEvent('Admin Action', {
       action: 'Log cleanup finished',
       deletedDbLogCount,
       deletedFileCount,

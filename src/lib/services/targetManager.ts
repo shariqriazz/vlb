@@ -284,7 +284,7 @@ class TargetManager {
               // --- Check 5: Is rotation by request count needed? ---
               // Fetch current settings dynamically
               const settings = await readSettings();
-              const rotationThreshold = settings.keyRotationRequestCount; // Assuming this is the setting name
+              const rotationThreshold = settings.targetRotationRequestCount; // Use the correct setting name
 
               if (rotationThreshold > 0 && this.requestCounter >= rotationThreshold) {
                 logTargetEvent('Target Request Count Rotation Triggered (getTarget)', { // Use logTargetEvent
