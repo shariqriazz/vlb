@@ -2,6 +2,7 @@ import { open, Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs/promises';
+import { Mutex } from 'async-mutex'; // Import Mutex
 import { logError } from './services/logger'; // Assuming logger is needed
 
 // Define the path for the database file within the 'data' directory
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 
 let dbInstance: Database | null = null;
+const dbInitMutex = new Mutex(); // Create a mutex for initialization
 
 // Function to ensure the data directory exists
 async function ensureDataDir() {
@@ -119,11 +121,27 @@ async function initializeDatabase(): Promise<Database> {
   return db;
 }
 
-// Function to get the database instance (singleton pattern)
+// Function to get the database instance (singleton pattern with mutex)
 export async function getDb(): Promise<Database> {
-  if (!dbInstance) {
+  // Quick check first (most calls will hit this)
+  if (dbInstance) {
+    return dbInstance;
+  }
+
+  // If instance doesn't exist, acquire lock to initialize
+  return await dbInitMutex.runExclusive(async () => {
+    // Double-check inside the lock in case another process initialized it
+    // while this one was waiting for the lock
+    if (dbInstance) {
+      return dbInstance;
+    }
+
+    // Proceed with initialization
     try {
+      console.log("Attempting database initialization..."); // Add log
       dbInstance = await initializeDatabase();
+      console.log("Database initialization successful."); // Add log
+      return dbInstance;
     } catch (error) {
       logError(error, { context: 'getDb initialization' });
       console.error('Failed to initialize database:', error);
@@ -131,8 +149,7 @@ export async function getDb(): Promise<Database> {
       // or handle this error more gracefully.
       process.exit(1); // Exit if DB connection fails critically
     }
-  }
-  return dbInstance;
+  });
 }
 
 // Remove this duplicate export at the end of the file
