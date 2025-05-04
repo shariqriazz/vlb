@@ -25,3 +25,6 @@ package-lock.json
 # Roo files
 .roo/
 .rood/
+.roomodes
+/docs
+
