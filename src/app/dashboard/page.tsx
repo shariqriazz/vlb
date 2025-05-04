@@ -1,33 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
 import {
-  Box,
-  Heading,
-  Text,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
   Card,
+  CardContent,
   CardHeader,
-  CardBody,
-  SimpleGrid,
-  Icon,
-  Flex,
-  useColorModeValue,
+  CardTitle,
+  CardDescription // Added for stat help text
+} from "@/components/ui/card";
+import {
   Tooltip,
-  IconButton,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Alert,
-  AlertIcon,
-  AlertTitle,
   AlertDescription,
-  useToast
-} from '@chakra-ui/react';
-// Added FiTarget to imports
-import { FiKey, FiActivity, FiCpu, FiAlertCircle, FiRefreshCw, FiTarget } from 'react-icons/fi';
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Key, Activity, Cpu, AlertCircle, RefreshCw, Target as TargetIcon, AlertTriangle } from 'lucide-react'; // Use lucide-react icons
 import AppLayout from '@/components/layout/AppLayout';
-import TargetStats from '@/components/targets/TargetStats';
+import TargetStats from '@/components/targets/TargetStats'; // Keep this import
+import { useToast } from "@/hooks/use-toast"; // Keep custom hook
 
 // Define the interface for VertexTarget (can be moved to a shared types file later)
 interface VertexTarget {
@@ -35,7 +31,7 @@ interface VertexTarget {
   name?: string;
   projectId: string;
   location: string;
-  modelId: string;
+  // modelId: string; // Removed
   isActive: boolean;
   lastUsed: string | null;
   rateLimitResetAt: string | null;
@@ -51,7 +47,6 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [targets, setTargets] = useState<VertexTarget[]>([]); // State for targets
-  // Update state structure to reflect target-based stats
   const [stats, setStats] = useState({
     totalTargets: 0,
     activeTargets: 0,
@@ -62,9 +57,7 @@ export default function Dashboard() {
     avgResponseTime: 0 // Added avg response time
   });
 
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const toast = useToast();
+  const { toast } = useToast(); // Use the custom hook
 
   const fetchStats = async () => {
     setIsLoading(true);
@@ -123,9 +116,7 @@ export default function Dashboard() {
       toast({
         title: 'Error',
         description: err.message || 'Failed to fetch dashboard data',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        variant: 'destructive', // Use shadcn variant
       });
     } finally {
       setIsLoading(false);
@@ -134,130 +125,113 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Keep dependency array empty for initial fetch
+
+  // Helper component for Stat Cards
+  const StatCard = ({ icon: IconComponent, title, value, helpText, iconColor = "text-primary" }: { icon: React.ElementType, title: string, value: string | number, helpText: string, iconColor?: string }) => (
+    <Card>
+      <CardContent className="pt-6"> {/* Add padding */}
+        <div className="flex items-center space-x-3">
+          <IconComponent className={`h-6 w-6 ${iconColor}`} />
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold">{isLoading ? '-' : value}</p>
+            <p className="text-xs text-muted-foreground">{helpText}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <AppLayout>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Box>
-          <Heading size="lg">Dashboard</Heading>
-          <Text color="gray.500">Overview of your Load Balancer</Text>
-        </Box>
-        <Tooltip label="Refresh Dashboard">
-          <IconButton
-            aria-label="Refresh dashboard"
-            icon={<FiRefreshCw />}
-            onClick={fetchStats}
-            isLoading={isLoading}
+      <TooltipProvider>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold">Dashboard</h1>
+            <p className="text-muted-foreground">Overview of your Load Balancer</p>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                aria-label="Refresh dashboard"
+                variant="ghost"
+                size="icon"
+                onClick={fetchStats}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh Dashboard</TooltipContent>
+          </Tooltip>
+        </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTriangle className="w-4 h-4" /> {/* Use lucide icon */}
+            <AlertTitle>Error!</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Grid for Stats */}
+        <div className="grid gap-6 mb-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6">
+          <StatCard
+            icon={TargetIcon}
+            title="Total Targets"
+            value={stats.totalTargets}
+            helpText="Vertex AI Targets Configured"
+            iconColor="text-blue-500"
           />
-        </Tooltip>
-      </Flex>
+          <StatCard
+            icon={Activity}
+            title="Active Targets"
+            value={stats.activeTargets}
+            helpText="Ready for Use"
+            iconColor="text-green-500"
+          />
+          <StatCard
+            icon={Cpu}
+            title="Requests (24h)"
+            value={stats.totalRequests24h}
+            helpText="Last 24 Hours"
+            iconColor="text-cyan-500"
+          />
+          <StatCard
+            icon={Cpu}
+            title="Requests (Today)"
+            value={stats.totalRequestsToday}
+            helpText="Since Midnight"
+            iconColor="text-teal-500"
+          />
+          <StatCard
+            icon={Cpu}
+            title="Requests (Lifetime)"
+            value={stats.totalRequests}
+            helpText="All Time"
+            iconColor="text-purple-500"
+          />
+          <StatCard
+            icon={AlertCircle}
+            title="Target Error Rate"
+            value={`${stats.targetErrorRate.toFixed(1)}%`}
+            helpText="Last 24 Hours"
+            iconColor="text-orange-500"
+          />
+        </div>
 
-      {error && (
-        <Alert status="error" mb={6} borderRadius="md">
-          <AlertIcon />
-          <AlertTitle>Error!</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3, xl: 6 }} spacing={6} mb={8}>
-        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-          <CardBody>
-            <Flex align="center" mb={2}>
-              {/* Update Icon and Label */}
-              <Icon as={FiTarget} boxSize={6} color="blue.500" mr={2} />
-              <Stat>
-                <StatLabel>Total Targets</StatLabel>
-                {/* Use totalTargets */}
-                <StatNumber>{isLoading ? '-' : stats.totalTargets}</StatNumber>
-                {/* Update help text */}
-                <StatHelpText>Vertex AI Targets Configured</StatHelpText>
-              </Stat>
-            </Flex>
-          </CardBody>
+        {/* Target Performance Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Target Performance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TargetStats targets={targets} fetchTargets={fetchStats} isLoading={isLoading} />
+          </CardContent>
         </Card>
-
-        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-          <CardBody>
-            <Flex align="center" mb={2}>
-              <Icon as={FiActivity} boxSize={6} color="green.500" mr={2} />
-              <Stat>
-                {/* Update Label */}
-                <StatLabel>Active Targets</StatLabel>
-                {/* Use activeTargets */}
-                <StatNumber>{isLoading ? '-' : stats.activeTargets}</StatNumber>
-                <StatHelpText>Ready for Use</StatHelpText>
-              </Stat>
-            </Flex>
-          </CardBody>
-        </Card>
-        {/* Card for Total Requests (24h) */}
-        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-          <CardBody>
-            <Flex align="center" mb={2}>
-              <Icon as={FiCpu} boxSize={6} color="cyan.500" mr={2} />
-              <Stat>
-                <StatLabel>Total Requests (24h)</StatLabel>
-                <StatNumber>{isLoading ? '-' : stats.totalRequests24h}</StatNumber>
-                <StatHelpText>Last 24 Hours</StatHelpText>
-              </Stat>
-            </Flex>
-          </CardBody>
-        </Card>
-
-        {/* Card for Total Requests Today */}
-        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-          <CardBody>
-            <Flex align="center" mb={2}>
-              <Icon as={FiCpu} boxSize={6} color="teal.500" mr={2} />
-              <Stat>
-                <StatLabel>Total Requests (Today)</StatLabel>
-                <StatNumber>{isLoading ? '-' : stats.totalRequestsToday}</StatNumber>
-                <StatHelpText>Since Midnight</StatHelpText>
-              </Stat>
-            </Flex>
-          </CardBody>
-        </Card>
-
-        {/* Card for Total Requests (Lifetime) */}
-        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-          <CardBody>
-            <Flex align="center" mb={2}>
-              <Icon as={FiCpu} boxSize={6} color="purple.500" mr={2} />
-              <Stat>
-                <StatLabel>Total Requests (Lifetime)</StatLabel>
-                <StatNumber>{isLoading ? '-' : stats.totalRequests}</StatNumber>
-                <StatHelpText>All Time</StatHelpText>
-              </Stat>
-            </Flex>
-          </CardBody>
-        </Card>
-
-        {/* Card for Target Error Rate */}
-        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-          <CardBody>
-            <Flex align="center" mb={2}>
-              <Icon as={FiAlertCircle} boxSize={6} color="orange.500" mr={2} />
-              <Stat>
-                <StatLabel>Target Error Rate</StatLabel>
-                <StatNumber>{isLoading ? '-' : `${stats.targetErrorRate.toFixed(1)}%`}</StatNumber>
-                <StatHelpText>Last 24 Hours</StatHelpText>
-              </Stat>
-            </Flex>
-          </CardBody>
-        </Card>
-</SimpleGrid>
-
-      <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm" mb={8}>
-        <CardHeader>
-          {/* Update Heading */}
-          <Heading size="md">Target Performance</Heading>
-        </CardHeader>
-        <CardBody>
-          <TargetStats targets={targets} fetchTargets={fetchStats} isLoading={isLoading} />
-        </CardBody>
-      </Card>
+      </TooltipProvider>
     </AppLayout>
   );
 }

@@ -1,59 +1,57 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Box,
   Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  Skeleton,
-  Text,
-  useColorModeValue,
-  Flex,
-  Button,
-  IconButton,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
   Tooltip,
-  HStack,
-  useToast,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import {
   AlertDialog,
-  AlertDialogBody,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogContent,
-  AlertDialogOverlay,
-  useDisclosure,
-  Switch,
-  // Add NumberInput components
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  // Add Checkbox
-  Checkbox,
-  Select,
-  InputGroup,
-  InputRightElement,
-} from '@chakra-ui/react';
-import { FiRefreshCw, FiTrash2, FiEdit2, FiSettings, FiAlertTriangle, FiTarget } from 'react-icons/fi';
-import { useRef, useMemo } from 'react';
-// Import modal components for editing
+  AlertDialogTitle,
+  AlertDialogTrigger, // Will trigger manually
+} from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  FormControl,
-  FormLabel,
-  Input,
-} from '@chakra-ui/react';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger, // Will trigger manually
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { RefreshCw, Trash2, Edit2, Settings, AlertTriangle, Target as TargetIcon } from 'lucide-react'; // Use lucide-react
 import { locationOptions, modelIdOptions } from '@/lib/constants/vertexOptions';
 
 // Updated interface for VertexTarget (matching TargetsPage)
@@ -81,51 +79,42 @@ interface TargetStatsProps {
   isLoading: boolean; // Receive loading state from parent
 }
 
-
-export default function TargetStats({ targets: initialTargets, fetchTargets, isLoading: parentIsLoading }: TargetStatsProps) { // Renamed component and added props
-  // Use props for initial state and loading indicator
+export default function TargetStats({ targets: initialTargets, fetchTargets, isLoading: parentIsLoading }: TargetStatsProps) {
   const [targets, setTargets] = useState<VertexTarget[]>(initialTargets);
-  const [isLoading, setIsLoading] = useState(parentIsLoading); // Use parent loading state initially
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null); // Renamed state
-  const [isToggling, setIsToggling] = useState<{[key: string]: boolean}>({});
+  const [isLoading, setIsLoading] = useState(parentIsLoading);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [isToggling, setIsToggling] = useState<{ [key: string]: boolean }>({});
+  const { toast } = useToast();
+
   // State for Delete confirmation
-  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
-  const cancelRefDelete = useRef<HTMLButtonElement>(null);
-  const toast = useToast();
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
   // State for Rate Limit Override confirmation
-  const { isOpen: isWarnOpen, onOpen: onWarnOpen, onClose: onWarnClose } = useDisclosure();
-  const cancelRefWarn = useRef<HTMLButtonElement>(null);
-  const [targetToToggle, setTargetToToggle] = useState<string | null>(null); // Renamed state
+  const [isWarnOpen, setIsWarnOpen] = useState(false);
+  const [targetToToggle, setTargetToToggle] = useState<string | null>(null);
 
   // State for Edit modal
-  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
-  const [editingTarget, setEditingTarget] = useState<VertexTarget | null>(null); // Renamed state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<VertexTarget | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
-  const [editProjectIdValue, setEditProjectIdValue] = useState(''); // Added state
-  const [editLocationValue, setEditLocationValue] = useState('');   // Added state
+  const [editProjectIdValue, setEditProjectIdValue] = useState('');
+  const [editLocationValue, setEditLocationValue] = useState('');
   const [editLocationCustomValue, setEditLocationCustomValue] = useState('');
   const [isEditCustomLocation, setIsEditCustomLocation] = useState(false);
-  // Removed Model ID state
-  // const [editModelIdValue, setEditModelIdValue] = useState('');
-  // const [editModelIdCustomValue, setEditModelIdCustomValue] = useState('');
-  // const [isEditCustomModelId, setIsEditCustomModelId] = useState(false);
   const [editRateLimitValue, setEditRateLimitValue] = useState<string>('');
   const [isSavingChanges, setIsSavingChanges] = useState(false);
 
   // State for bulk selection
-  const [selectedTargetIds, setSelectedTargetIds] = useState<Set<string>>(new Set()); // Renamed state
+  const [selectedTargetIds, setSelectedTargetIds] = useState<Set<string>>(new Set());
 
   // State for Bulk Limit Modal
-  const { isOpen: isBulkLimitOpen, onOpen: onBulkLimitOpen, onClose: onBulkLimitClose } = useDisclosure();
+  const [isBulkLimitOpen, setIsBulkLimitOpen] = useState(false);
   const [bulkLimitValue, setBulkLimitValue] = useState<string>('');
   const [isApplyingBulkLimit, setIsApplyingBulkLimit] = useState(false);
 
   // State for Bulk Delete Modal
-  const { isOpen: isBulkDeleteOpen, onOpen: onBulkDeleteOpen, onClose: onBulkDeleteClose } = useDisclosure();
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
-  const cancelRefBulkDelete = useRef<HTMLButtonElement>(null);
-  const tableBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
 
   // Update local state when props change
   useEffect(() => {
@@ -136,24 +125,23 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
     setIsLoading(parentIsLoading);
   }, [parentIsLoading]);
 
-
   // Refresh data using the passed function
   const refreshData = () => {
     fetchTargets(); // Use the prop function
   };
 
-  // Function to get status badge (logic remains similar)
-  const getStatusBadge = (target: VertexTarget) => { // Updated parameter type
+  // Function to get status badge
+  const getStatusBadge = (target: VertexTarget) => {
     if (!target.isActive) {
-      return <Badge colorScheme="gray">Disabled</Badge>;
+      return <Badge variant="secondary">Disabled</Badge>; // Use 'secondary' for gray-ish
     }
     if (target.isDisabledByRateLimit) {
-      return <Badge colorScheme="orange">Daily Limited</Badge>;
+      return <Badge variant="destructive">Daily Limited</Badge>; // Use 'destructive' for orange/red
     }
     if (target.rateLimitResetAt && new Date(target.rateLimitResetAt) > new Date()) {
-      return <Badge colorScheme="yellow">Rate Limited</Badge>;
+      return <Badge variant="outline">Rate Limited</Badge>; // Use 'outline' for yellow-ish
     }
-    return <Badge colorScheme="green">Active</Badge>;
+    return <Badge variant="default">Active</Badge>; // Use 'default' for green (or primary color)
   };
 
   // Function to format date (no change needed)
@@ -163,104 +151,94 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
     return date.toLocaleString();
   };
 
-  // Function to delete a target
-  const handleDeleteTarget = async () => { // Renamed function
+   // --- Delete Logic ---
+   const openDeleteDialog = (targetId: string) => {
+    setSelectedTargetId(targetId);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDeleteTarget = async () => {
     if (!selectedTargetId) return;
 
     try {
-      const response = await fetch(`/api/admin/targets/${selectedTargetId}`, { // Updated endpoint
+      const response = await fetch(`/api/admin/targets/${selectedTargetId}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete target'); // Updated error message
+        throw new Error('Failed to delete target');
       }
 
       toast({
         title: 'Success',
-        description: 'Vertex Target deleted successfully', // Updated message
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+        description: 'Vertex Target deleted successfully',
+        variant: "default",
       });
 
-      // Refresh the list using the prop function
-      fetchTargets();
+      fetchTargets(); // Refresh the list
     } catch (error) {
-      console.error('Error deleting target:', error); // Updated log message
+      console.error('Error deleting target:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete Vertex Target', // Updated message
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        description: 'Failed to delete Vertex Target',
+        variant: 'destructive',
       });
     } finally {
-      onDeleteClose();
+      setIsDeleteOpen(false);
       setSelectedTargetId(null); // Clear selected target ID
     }
   };
 
-  // Extracted API call logic for toggling
-  const proceedWithToggle = async (targetId: string) => { // Renamed parameter
+  // --- Toggle Logic ---
+  const proceedWithToggle = async (targetId: string) => {
     setIsToggling(prev => ({ ...prev, [targetId]: true }));
     let success = false;
     try {
-      const response = await fetch(`/api/admin/targets/${targetId}`, { // Updated endpoint
-        method: 'PATCH',
+      const response = await fetch(`/api/admin/targets/${targetId}`, {
+        method: 'PATCH', // Assuming PATCH toggles the isActive status
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update target status'); // Updated error message
+        throw new Error('Failed to update target status');
       }
 
-      const data = await response.json();
       success = true;
-
       toast({
         title: 'Success',
-        description: `Vertex Target status updated successfully.`, // Updated message
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+        description: `Vertex Target status updated successfully.`,
+        variant: "default",
       });
-
-      // Refresh the list
-      fetchTargets();
+      fetchTargets(); // Refresh the list
 
     } catch (error) {
-      console.error('Error toggling target status:', error); // Updated log message
+      console.error('Error toggling target status:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update Vertex Target status', // Updated message
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        description: 'Failed to update Vertex Target status',
+        variant: 'destructive',
       });
     } finally {
       setIsToggling(prev => ({ ...prev, [targetId]: false }));
-      onWarnClose();
-      setTargetToToggle(null); // Clear the target ID
+      setIsWarnOpen(false); // Close warn dialog if open
+      setTargetToToggle(null);
     }
   };
 
-  // Function to handle the toggle action, potentially showing a warning
-  const handleToggleTarget = (targetId: string, currentStatus: boolean, isDisabledByRateLimit: boolean) => { // Renamed function and parameter
+  const handleToggleTarget = (targetId: string, currentStatus: boolean, isDisabledByRateLimit: boolean) => {
     if (!currentStatus && isDisabledByRateLimit) {
       setTargetToToggle(targetId); // Store the target ID
-      onWarnOpen();
+      setIsWarnOpen(true); // Open the warning dialog
     } else {
       proceedWithToggle(targetId);
     }
   };
 
-  // Function to handle opening the edit modal
-  const handleOpenEditModal = (target: VertexTarget) => { // Renamed parameter
-    setEditingTarget(target); // Renamed state
+  // --- Edit Logic ---
+  const handleOpenEditModal = (target: VertexTarget) => {
+    setEditingTarget(target);
     setEditNameValue(target.name || '');
-    setEditProjectIdValue(target.projectId); // Set new state
+    setEditProjectIdValue(target.projectId);
 
-    // Check if location is in predefined options
     const locationExists = locationOptions.some(option => option.value === target.location);
     if (locationExists) {
       setEditLocationValue(target.location);
@@ -271,24 +249,11 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
       setIsEditCustomLocation(true);
     }
 
-    // Removed Model ID logic
-    // const modelIdExists = modelIdOptions.some(option => option.value === target.modelId);
-    // if (modelIdExists) {
-    //   setEditModelIdValue(target.modelId);
-    //   setIsEditCustomModelId(false);
-    // } else {
-    //   setEditModelIdValue('custom');
-    //   setEditModelIdCustomValue(target.modelId);
-    //   setIsEditCustomModelId(true);
-    // }
-
     setEditRateLimitValue(target.dailyRateLimit?.toString() ?? '');
-    onEditOpen();
+    setIsEditOpen(true); // Open the edit dialog
   };
 
-  // Handle location selection in edit modal
-  const handleEditLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
+  const handleEditLocationChange = (value: string) => {
     if (value === 'custom') {
       setIsEditCustomLocation(true);
       setEditLocationValue('custom');
@@ -298,49 +263,39 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
     }
   };
 
-  // Removed handleEditModelIdChange
-
-  // Function to save the edited changes
-  const handleSaveTargetChanges = async () => { // Renamed function
+  const handleSaveTargetChanges = async () => {
     if (!editingTarget) return;
     setIsSavingChanges(true);
 
-    // Get the actual location value (either from dropdown or custom input)
     const locationValue = isEditCustomLocation ? editLocationCustomValue.trim() : editLocationValue.trim();
-    // Removed modelIdValue
 
-    // --- Input Validation ---
     let rateLimitToSend: number | null = null;
     if (editRateLimitValue.trim() === '') {
       rateLimitToSend = null;
     } else {
       const parsedLimit = parseInt(editRateLimitValue, 10);
       if (isNaN(parsedLimit) || parsedLimit < 0) {
-        toast({ title: 'Invalid Input', description: 'Daily Rate Limit must be a non-negative number or empty.', status: 'error', duration: 4000, isClosable: true });
+        toast({ title: 'Invalid Input', description: 'Daily Rate Limit must be a non-negative number or empty.', variant: 'destructive' });
         setIsSavingChanges(false);
         return;
       }
       rateLimitToSend = parsedLimit;
     }
-    // Validate new fields (removed modelIdValue)
     if (!editProjectIdValue.trim() || !locationValue) {
-         toast({ title: 'Invalid Input', description: 'Project ID and Location cannot be empty.', status: 'error', duration: 4000, isClosable: true }); // Updated description
+         toast({ title: 'Invalid Input', description: 'Project ID and Location cannot be empty.', variant: 'destructive' });
          setIsSavingChanges(false);
          return;
     }
-    // --- End Validation ---
 
     try {
       const bodyToSend = {
         name: editNameValue.trim() || undefined,
-        projectId: editProjectIdValue.trim(), // Add new field
-        location: locationValue,   // Use the resolved location value
-        // modelId: modelIdValue, // Removed
+        projectId: editProjectIdValue.trim(),
+        location: locationValue,
         dailyRateLimit: rateLimitToSend,
-        // SA Key JSON is NOT updated via this PUT request
       };
 
-      const response = await fetch(`/api/admin/targets/${editingTarget._id}`, { // Updated endpoint
+      const response = await fetch(`/api/admin/targets/${editingTarget._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyToSend),
@@ -348,87 +303,84 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update target'); // Updated error message
+        throw new Error(errorData.error || 'Failed to update target');
       }
 
       toast({
         title: 'Success',
-        description: 'Vertex Target updated successfully', // Updated message
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+        description: 'Vertex Target updated successfully',
+        variant: "default",
       });
 
-      onEditClose();
+      setIsEditOpen(false); // Close the dialog
       fetchTargets(); // Refresh list
 
     } catch (error: any) {
-      console.error('Error updating target:', error); // Updated log message
+      console.error('Error updating target:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update Vertex Target', // Updated message
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        description: error.message || 'Failed to update Vertex Target',
+        variant: 'destructive',
       });
     } finally {
       setIsSavingChanges(false);
     }
   };
 
-// --- Bulk Action Handlers ---
+  // --- Bulk Action Handlers ---
+  const handleSelectTarget = (targetId: string) => {
+    setSelectedTargetIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(targetId)) {
+        newSet.delete(targetId);
+      } else {
+        newSet.add(targetId);
+      }
+      return newSet;
+    });
+  };
 
-const handleSelectTarget = (targetId: string, isSelected: boolean) => { // Renamed function and parameter
-  setSelectedTargetIds(prev => { // Renamed state
-    const newSet = new Set(prev);
-    if (isSelected) {
-      newSet.add(targetId);
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedTargetIds(new Set(targets.map(target => target._id)));
     } else {
-      newSet.delete(targetId);
+      setSelectedTargetIds(new Set());
     }
-    return newSet;
-  });
-};
+  };
 
-const handleSelectAll = (isSelected: boolean) => {
-  if (isSelected) {
-    setSelectedTargetIds(new Set(targets.map(target => target._id))); // Use targets state
-  } else {
-    setSelectedTargetIds(new Set()); // Renamed state
-  }
-};
+  const isAllSelected = useMemo(() => targets.length > 0 && selectedTargetIds.size === targets.length, [selectedTargetIds, targets]);
+  const selectAllCheckedState = useMemo(() => {
+    if (isAllSelected) return true;
+    if (selectedTargetIds.size > 0) return 'indeterminate';
+    return false;
+  }, [isAllSelected, selectedTargetIds.size]);
 
-// Memoize values for "select all" checkbox state
-const isAllSelected = useMemo(() => targets.length > 0 && selectedTargetIds.size === targets.length, [selectedTargetIds, targets]); // Use targets state
-const isIndeterminate = useMemo(() => selectedTargetIds.size > 0 && selectedTargetIds.size < targets.length, [selectedTargetIds, targets]); // Use targets state
 
-const handleApplyBulkLimit = async () => {
-    if (selectedTargetIds.size === 0) return; // Use renamed state
+  const handleApplyBulkLimit = async () => {
+    if (selectedTargetIds.size === 0) return;
     setIsApplyingBulkLimit(true);
 
-    // --- Input Validation (remains same) ---
     let rateLimitToSend: number | null = null;
     if (bulkLimitValue.trim() === '') {
         rateLimitToSend = null;
     } else {
         const parsedLimit = parseInt(bulkLimitValue, 10);
         if (isNaN(parsedLimit) || parsedLimit < 0) {
-            toast({ title: 'Invalid Input', description: 'Daily Rate Limit must be a non-negative number or empty.', status: 'error', duration: 4000, isClosable: true });
+            toast({ title: 'Invalid Input', description: 'Daily Rate Limit must be a non-negative number or empty.', variant: 'destructive' });
             setIsApplyingBulkLimit(false);
             return;
         }
         rateLimitToSend = parsedLimit;
     }
-    // --- End Validation ---
 
     try {
-        const response = await fetch('/api/admin/targets/bulk', { // Updated endpoint
+        const response = await fetch('/api/admin/targets/bulk', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'setLimit',
-                targetIds: Array.from(selectedTargetIds), // Use renamed state
-                dailyRateLimit: rateLimitToSend, // Use correct field name from backend
+                targetIds: Array.from(selectedTargetIds),
+                dailyRateLimit: rateLimitToSend,
             }),
         });
 
@@ -440,450 +392,401 @@ const handleApplyBulkLimit = async () => {
 
         toast({
             title: 'Success',
-            description: result.message || `Successfully updated limit for ${result.count} targets.`, // Updated message
-            status: 'success',
-            duration: 3000,
-            isClosable: true,
+            description: result.message || `Successfully updated limit for ${result.count} targets.`,
+            variant: "default",
         });
 
-        onBulkLimitClose();
-        setSelectedTargetIds(new Set()); // Clear selection (renamed state)
+        setIsBulkLimitOpen(false);
+        setSelectedTargetIds(new Set());
         setBulkLimitValue('');
-        fetchTargets(); // Refresh list
+        fetchTargets();
 
     } catch (error: any) {
         console.error('Error applying bulk limit:', error);
-        toast({ title: 'Error', description: error.message || 'Failed to apply bulk limit', status: 'error', duration: 5000, isClosable: true });
+        toast({ title: 'Error', description: error.message || 'Failed to apply bulk limit', variant: 'destructive' });
     } finally {
         setIsApplyingBulkLimit(false);
     }
-};
+  };
 
-const handleBulkDelete = async () => {
-    if (selectedTargetIds.size === 0) return; // Use renamed state
+  const openBulkDeleteDialog = () => {
+    if (selectedTargetIds.size > 0) {
+        setIsBulkDeleteOpen(true);
+    }
+   };
+
+
+  const handleBulkDelete = async () => {
+    if (selectedTargetIds.size === 0) return;
     setIsDeletingBulk(true);
 
     try {
-        const response = await fetch('/api/admin/targets/bulk', { // Updated endpoint
+        const response = await fetch('/api/admin/targets/bulk', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'delete',
-                targetIds: Array.from(selectedTargetIds), // Use renamed state
+                targetIds: Array.from(selectedTargetIds),
             }),
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-            throw new Error(result.error || 'Failed to bulk delete targets'); // Updated message
+            throw new Error(result.error || 'Failed to bulk delete targets');
         }
 
         toast({
             title: 'Success',
-            description: result.message || `Successfully deleted ${result.count} targets.`, // Updated message
-            status: 'success',
-            duration: 3000,
-            isClosable: true,
+            description: result.message || `Successfully deleted ${result.count} targets.`,
+            variant: "default",
         });
 
-        onBulkDeleteClose();
-        setSelectedTargetIds(new Set()); // Clear selection (renamed state)
-        fetchTargets(); // Refresh list
+        setIsBulkDeleteOpen(false);
+        setSelectedTargetIds(new Set());
+        fetchTargets();
 
     } catch (error: any) {
-        console.error('Error bulk deleting targets:', error); // Updated log message
-        toast({ title: 'Error', description: error.message || 'Failed to bulk delete targets', status: 'error', duration: 5000, isClosable: true }); // Updated message
+        console.error('Error bulk deleting targets:', error);
+        toast({ title: 'Error', description: error.message || 'Failed to bulk delete targets', variant: 'destructive' });
     } finally {
         setIsDeletingBulk(false);
     }
-};
+  };
 
+  return (
+    <TooltipProvider>
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-4">
+          {/* Left side: Selection count and bulk actions */}
+          <div className="flex items-center space-x-4">
+            {selectedTargetIds.size > 0 && (
+              <>
+                <span className="text-sm font-medium">
+                  {selectedTargetIds.size} selected
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsBulkLimitOpen(true)}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Set Limit
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Set Daily Limit for Selected Targets</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={openBulkDeleteDialog}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete ({selectedTargetIds.size})
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Selected Targets</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </div>
 
-// --- End Bulk Action Handlers ---
+          {/* Right side: Total count and refresh */}
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-muted-foreground">
+              Total: {targets.length} targets
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={refreshData}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
 
-
-return (
-  <Box>
-    <Flex justify="space-between" align="center" mb={4}>
-      {/* Left side: Selection count and bulk actions */}
-      <HStack spacing={4}>
-         {selectedTargetIds.size > 0 && ( // Use renamed state
-           <>
-             <Text fontSize="sm" fontWeight="medium">
-               {selectedTargetIds.size} selected {/* Use renamed state */}
-             </Text>
-             <Tooltip label="Set Daily Limit for Selected Targets"> {/* Updated label */}
-               <Button
-                 size="sm"
-                 leftIcon={<FiSettings />}
-                 colorScheme="teal"
-                 variant="outline"
-                 onClick={onBulkLimitOpen}
-               >
-                 Set Limit
-               </Button>
-             </Tooltip>
-             <Tooltip label="Delete Selected Targets"> {/* Updated label */}
-               <Button
-                 size="sm"
-                 leftIcon={<FiTrash2 />}
-                 colorScheme="red"
-                 variant="outline"
-                 onClick={onBulkDeleteOpen}
-               >
-                 Delete ({selectedTargetIds.size}) {/* Use renamed state */}
-               </Button>
-             </Tooltip>
-           </>
-         )}
-      </HStack>
-
-      {/* Right side: Total count and refresh */}
-      <HStack spacing={4}>
-         <Text fontSize="sm" color="gray.500">
-           Total: {targets.length} targets {/* Use targets state, updated text */}
-         </Text>
-         <Button
-           size="sm"
-           leftIcon={<FiRefreshCw />}
-           onClick={refreshData}
-           isLoading={isLoading} // Use local loading state (synced with prop)
-         >
-           Refresh
-         </Button>
-      </HStack>
-    </Flex>
-
-      <Box overflowX="auto">
-        <Table variant="simple" size="sm" bg={tableBg} borderWidth="1px" borderColor={borderColor} borderRadius="md">
-          <Thead>
-             <Tr>
-               <Th paddingRight={2}>
-                 <Checkbox
-                   isChecked={isAllSelected}
-                   isIndeterminate={isIndeterminate}
-                   onChange={(e) => handleSelectAll(e.target.checked)}
-                   isDisabled={targets.length === 0} // Use targets state
-                 />
-               </Th>
-               <Th>Name</Th>
-               <Th>Project ID</Th> {/* Updated Header */}
-               <Th>Location</Th> {/* Updated Header */}
-               {/* <Th>Model ID</Th> Removed Header */}
-               <Th>Status</Th>
-               <Th>Last Used</Th>
-               <Th>Daily Usage / Limit</Th>
-               <Th>Requests (Total)</Th>
-               <Th>Failures</Th>
-               <Th>Enabled</Th>
-               <Th>Actions</Th>
-             </Tr>
-           </Thead>
-          <Tbody>
-            {/* Conditional Rendering Logic */}
-            {isLoading
-              ? /* Skeleton Loading State */
-                Array.from({ length: 3 }).map((_, index) => (
-                  <Tr key={`skeleton-${index}`}>
-                    <Td paddingRight={2}><Checkbox isDisabled /></Td>
-                    <Td><Skeleton height="20px" width="100px" /></Td>
-                    <Td><Skeleton height="20px" width="120px" /></Td> {/* Adjusted width */}
-                    <Td><Skeleton height="20px" width="80px" /></Td> {/* Adjusted width */}
-                    {/* <Td><Skeleton height="20px" width="150px" /></Td> Removed Skeleton */}
-                    <Td><Skeleton height="20px" width="80px" /></Td>
-                    <Td><Skeleton height="20px" width="150px" /></Td>
-                    <Td><Skeleton height="20px" width="100px" /></Td>
-                    <Td><Skeleton height="20px" width="60px" /></Td>
-                    <Td><Skeleton height="20px" width="60px" /></Td>
-                    <Td><Skeleton height="20px" width="60px" /></Td>
-                    <Td><Skeleton height="20px" width="100px" /></Td>
-                  </Tr>
-                ))
-             : !Array.isArray(targets) || targets.length === 0 // Check if it's an array AND empty
-             ? /* No Targets State */
-               <Tr>
-                  <Td colSpan={11} textAlign="center" py={4}> {/* Adjusted colSpan */}
-                    No Vertex targets found. Add a target to get started. {/* Updated text */}
-                  </Td>
-                </Tr>
-              : /* Targets Available State */
-                targets.map((target) => ( // Use targets state, rename variable
-                  <Tr key={target._id}>
-                    <Td paddingRight={2}>
-                      <Checkbox
-                        isChecked={selectedTargetIds.has(target._id)} // Use renamed state
-                        onChange={(e) => handleSelectTarget(target._id, e.target.checked)} // Use renamed handler
-                      />
-                    </Td>
-                    <Td>{target.name || <Text as="i" color="gray.500">N/A</Text>}</Td>
-                    <Td>{target.projectId}</Td> {/* Display Project ID */}
-                    <Td>{target.location}</Td> {/* Display Location */}
-                    {/* <Td>{target.modelId}</Td> Removed Model ID */}
-                    <Td>{getStatusBadge(target)}</Td>
-                    <Td>{formatDate(target.lastUsed)}</Td>
-                    <Td>{target.dailyRequestsUsed} / {(target.dailyRateLimit === null || target.dailyRateLimit === undefined) ? '∞' : target.dailyRateLimit}</Td>
-                    <Td>{target.requestCount}</Td>
-                    <Td>{target.failureCount}</Td>
-                    <Td><Switch isChecked={target.isActive} isDisabled={isToggling[target._id]} onChange={() => handleToggleTarget(target._id, target.isActive, target.isDisabledByRateLimit)} size="sm" /></Td> {/* Use renamed handler */}
-                    <Td>
-                      <HStack spacing={2}>
-                        <Tooltip label="Edit Target Details"> {/* Updated label */}
-                          <IconButton aria-label="Edit target details" icon={<FiEdit2 />} size="sm" variant="ghost" colorScheme="blue" onClick={() => handleOpenEditModal(target)} /> {/* Use renamed handler */}
-                        </Tooltip>
-                        <Tooltip label="Delete Target"> {/* Updated label */}
-                          <IconButton aria-label="Delete target" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" onClick={() => { setSelectedTargetId(target._id); onDeleteOpen(); }} /> {/* Use renamed state */}
-                        </Tooltip>
-                      </HStack>
-                    </Td>
-                  </Tr>
-                ))
-            }
-            {/* End of Conditional Rendering */}
-          </Tbody>
-        </Table>
-      </Box>
+        <div className="overflow-x-auto border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px] px-2">
+                  <Checkbox
+                    checked={selectAllCheckedState}
+                    onCheckedChange={handleSelectAll}
+                    disabled={targets.length === 0 || isLoading}
+                    aria-label="Select all targets"
+                  />
+                </TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Project ID</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Used</TableHead>
+                <TableHead>Daily Usage / Limit</TableHead>
+                <TableHead>Requests (Total)</TableHead>
+                <TableHead>Failures</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading
+                ? Array.from({ length: 3 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      <TableCell className="px-2"><Checkbox disabled /></TableCell>
+                      <TableCell><Skeleton className="w-24 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-32 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-20 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-20 h-5" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-36" /></TableCell>
+                      <TableCell><Skeleton className="w-24 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-16 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-16 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-16 h-5" /></TableCell>
+                      <TableCell><Skeleton className="w-20 h-5" /></TableCell>
+                    </TableRow>
+                  ))
+               : !Array.isArray(targets) || targets.length === 0
+               ? <TableRow><TableCell colSpan={11} className="py-4 text-center">No Vertex targets found.</TableCell></TableRow>
+               : targets.map((target) => (
+                    <TableRow key={target._id}>
+                      <TableCell className="px-2">
+                        <Checkbox
+                          checked={selectedTargetIds.has(target._id)}
+                          onCheckedChange={() => handleSelectTarget(target._id)}
+                          aria-label={`Select target ${target.name || target._id}`}
+                        />
+                      </TableCell>
+                      <TableCell>{target.name || <span className="italic text-muted-foreground">N/A</span>}</TableCell>
+                      <TableCell>{target.projectId}</TableCell>
+                      <TableCell>{target.location}</TableCell>
+                      <TableCell>{getStatusBadge(target)}</TableCell>
+                      <TableCell>{formatDate(target.lastUsed)}</TableCell>
+                      <TableCell>{target.dailyRequestsUsed} / {(target.dailyRateLimit === null || target.dailyRateLimit === undefined) ? '∞' : target.dailyRateLimit}</TableCell>
+                      <TableCell>{target.requestCount}</TableCell>
+                      <TableCell>{target.failureCount}</TableCell>
+                      <TableCell>
+                        <Switch
+                            checked={target.isActive}
+                            disabled={isToggling[target._id]}
+                            onCheckedChange={() => handleToggleTarget(target._id, target.isActive, target.isDisabledByRateLimit)}
+                            aria-label={target.isActive ? "Disable target" : "Enable target"}
+                         />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button aria-label="Edit target details" variant="ghost" size="icon" className="w-8 h-8" onClick={() => handleOpenEditModal(target)}>
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit Target Details</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                               <Button aria-label="Delete target" variant="ghost" size="icon" className="w-8 h-8 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => openDeleteDialog(target._id)}>
+                                <Trash2 className="w-4 h-4" />
+                               </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete Target</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+              }
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        isOpen={isDeleteOpen}
-        leastDestructiveRef={cancelRefDelete}
-        onClose={onDeleteClose}
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Delete Vertex Target {/* Updated title */}
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              Are you sure you want to delete this Vertex Target? This action cannot be undone. {/* Updated text */}
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button ref={cancelRefDelete} onClick={onDeleteClose}>
-                Cancel
-              </Button>
-              <Button colorScheme="red" onClick={handleDeleteTarget} ml={3}> {/* Use renamed handler */}
-                Delete
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>Delete Vertex Target</AlertDialogHeader>
+          <AlertDialogDescription>
+            Are you sure you want to delete this Vertex Target? This action cannot be undone.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTarget} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Target Modal */}
-      <Modal isOpen={isEditOpen} onClose={onEditClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Edit Vertex Target</ModalHeader> {/* Updated title */}
-          <ModalCloseButton />
-          <ModalBody pb={6}> {/* Add padding */}
-            <FormControl mb={4}> {/* Name */}
-              <FormLabel>Target Name</FormLabel>
+      {/* Edit Target Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Vertex Target</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid items-center grid-cols-4 gap-4">
+              <Label htmlFor="edit-name" className="text-right">Name</Label>
               <Input
-                placeholder="Enter a name for this target"
+                id="edit-name"
+                placeholder="(Optional)"
                 value={editNameValue}
                 onChange={(e) => setEditNameValue(e.target.value)}
+                className="col-span-3"
               />
-              <Text fontSize="xs" color="gray.500" mt={1}>
-                Optional name to help identify the target.
-              </Text>
-            </FormControl>
-
-             <FormControl isRequired mb={4}> {/* Project ID */}
-              <FormLabel>Project ID</FormLabel>
+            </div>
+             <div className="grid items-center grid-cols-4 gap-4">
+              <Label htmlFor="edit-project-id" className="text-right">Project ID *</Label>
               <Input
+                id="edit-project-id"
                 placeholder="your-gcp-project-id"
                 value={editProjectIdValue}
                 onChange={(e) => setEditProjectIdValue(e.target.value)}
+                className="col-span-3"
+                required
               />
-            </FormControl>
-
-             <FormControl isRequired mb={4}> {/* Location */}
-              <FormLabel>Location</FormLabel>
-              {!isEditCustomLocation ? (
-                <Select
-                  placeholder="Select location"
-                  value={editLocationValue}
-                  onChange={handleEditLocationChange}
-                >
-                  {locationOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                  <option value="custom">Custom location...</option>
-                </Select>
-              ) : (
-                <InputGroup>
-                  <Input
-                    placeholder="Enter custom location (e.g., us-central1)"
-                    value={editLocationCustomValue}
-                    onChange={(e) => setEditLocationCustomValue(e.target.value)}
-                  />
-                  <InputRightElement width="4.5rem">
-                    <Button
-                      h="1.75rem"
-                      size="sm"
-                      onClick={() => {
-                        setIsEditCustomLocation(false);
-                        setEditLocationValue('');
-                      }}
-                    >
-                      Back
-                    </Button>
-                  </InputRightElement>
-                </InputGroup>
-              )}
-            </FormControl>
-
-            {/* Removed Model ID FormControl */}
-
-            {/* Daily Rate Limit Input */}
-            <FormControl>
-              <FormLabel>Daily Rate Limit (Requests)</FormLabel>
-              <NumberInput
+            </div>
+            <div className="grid items-center grid-cols-4 gap-4">
+              <Label htmlFor="edit-location" className="text-right">Location *</Label>
+              <div className="col-span-3">
+                  {!isEditCustomLocation ? (
+                    <Select value={editLocationValue} onValueChange={handleEditLocationChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locationOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom location...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                        <Input
+                            placeholder="Enter custom location (e.g., us-central1)"
+                            value={editLocationCustomValue}
+                            onChange={(e) => setEditLocationCustomValue(e.target.value)}
+                            required
+                        />
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setIsEditCustomLocation(false); setEditLocationValue(''); }}
+                        >
+                            Back
+                        </Button>
+                    </div>
+                  )}
+                </div>
+            </div>
+            <div className="grid items-center grid-cols-4 gap-4">
+              <Label htmlFor="edit-rate-limit" className="text-right">Daily Limit</Label>
+               <Input
+                id="edit-rate-limit"
+                type="number"
+                placeholder="Empty = no limit"
                 value={editRateLimitValue}
-                onChange={(valueAsString) => setEditRateLimitValue(valueAsString)}
-                min={0}
-                allowMouseWheel
-              >
-                <NumberInputField placeholder="Leave empty for no limit" />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-              <Text fontSize="xs" color="gray.500" mt={1}>
-                Max requests per target per day (UTC). Leave empty or set to 0 for unlimited. {/* Updated text */}
-              </Text>
-            </FormControl>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onEditClose}>
-              Cancel
+                onChange={(e) => setEditRateLimitValue(e.target.value)}
+                min="0"
+                className="col-span-3"
+              />
+            </div>
+             <p className="col-span-3 col-start-2 text-xs text-muted-foreground">Max requests per target per day (UTC). Leave empty or set to 0 for unlimited.</p>
+          </div>
+          <DialogFooter>
+             <DialogClose asChild>
+                <Button variant="outline" disabled={isSavingChanges}>Cancel</Button>
+             </DialogClose>
+            <Button onClick={handleSaveTargetChanges} disabled={isSavingChanges}>
+              {isSavingChanges ? 'Saving...' : 'Save Changes'}
             </Button>
-            <Button
-              colorScheme="blue"
-              onClick={handleSaveTargetChanges} // Use renamed handler
-              isLoading={isSavingChanges}
-            >
-              Save Changes
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Rate Limit Override Warning Dialog */}
-      <AlertDialog
-        isOpen={isWarnOpen}
-        leastDestructiveRef={cancelRefWarn}
-        onClose={() => { onWarnClose(); setTargetToToggle(null); }} // Use renamed state
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Enable Rate Limited Target? {/* Updated title */}
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              This Vertex Target was automatically disabled because it hit its daily request limit. {/* Updated text */}
-              Manually enabling it now will allow it to be used again today, potentially exceeding the intended limit.
-              Are you sure you want to proceed?
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button ref={cancelRefWarn} onClick={() => { onWarnClose(); setTargetToToggle(null); }}> {/* Use renamed state */}
-                Cancel
-              </Button>
-              <Button colorScheme="orange" onClick={() => targetToToggle && proceedWithToggle(targetToToggle)} ml={3}> {/* Use renamed state */}
-                Enable Anyway
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
+      <AlertDialog open={isWarnOpen} onOpenChange={setIsWarnOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>Enable Rate Limited Target?</AlertDialogHeader>
+          <AlertDialogDescription>
+            This Vertex Target was automatically disabled because it hit its daily request limit.
+            Manually enabling it now will allow it to be used again today, potentially exceeding the intended limit.
+            Are you sure you want to proceed?
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTargetToToggle(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => targetToToggle && proceedWithToggle(targetToToggle)} className="bg-orange-600 hover:bg-orange-700">
+              Enable Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Limit Setting Modal */}
-      <Modal isOpen={isBulkLimitOpen} onClose={onBulkLimitClose}>
-          <ModalOverlay />
-          <ModalContent>
-              <ModalHeader>Set Daily Limit for Selected Targets ({selectedTargetIds.size})</ModalHeader> {/* Updated title */}
-              <ModalCloseButton />
-              <ModalBody>
-                  <FormControl isRequired>
-                      <FormLabel>New Daily Rate Limit</FormLabel>
-                      <NumberInput
+      {/* Bulk Limit Setting Dialog */}
+      <Dialog open={isBulkLimitOpen} onOpenChange={setIsBulkLimitOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                  <DialogTitle>Set Daily Limit for Selected ({selectedTargetIds.size}) Targets</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                   <div className="grid items-center grid-cols-4 gap-4">
+                      <Label htmlFor="bulk-limit" className="text-right">New Daily Limit</Label>
+                      <Input
+                          id="bulk-limit"
+                          type="number"
+                          placeholder="Empty = no limit"
                           value={bulkLimitValue}
-                          onChange={(valueAsString) => setBulkLimitValue(valueAsString)}
-                          min={0}
-                          allowMouseWheel
-                      >
-                          <NumberInputField placeholder="Leave empty for no limit" />
-                          <NumberInputStepper>
-                              <NumberIncrementStepper />
-                              <NumberDecrementStepper />
-                          </NumberInputStepper>
-                      </NumberInput>
-                      <Text fontSize="xs" color="gray.500" mt={1}>
-                          Enter the maximum requests per day for the selected targets. Leave empty or set to 0 for unlimited. {/* Updated text */}
-                      </Text>
-                  </FormControl>
-              </ModalBody>
-              <ModalFooter>
-                  <Button variant="ghost" mr={3} onClick={onBulkLimitClose} isDisabled={isApplyingBulkLimit}>
-                      Cancel
-                  </Button>
+                          onChange={(e) => setBulkLimitValue(e.target.value)}
+                          min="0"
+                          className="col-span-3"
+                      />
+                  </div>
+                   <p className="col-span-3 col-start-2 text-xs text-muted-foreground">Enter the max requests per day for the selected targets. Leave empty or set to 0 for unlimited.</p>
+              </div>
+              <DialogFooter>
+                   <DialogClose asChild>
+                        <Button variant="outline" disabled={isApplyingBulkLimit}>Cancel</Button>
+                   </DialogClose>
                   <Button
-                      colorScheme="teal"
                       onClick={handleApplyBulkLimit}
-                      isLoading={isApplyingBulkLimit}
-                      isDisabled={selectedTargetIds.size === 0} // Use renamed state
+                      disabled={selectedTargetIds.size === 0 || isApplyingBulkLimit}
                   >
-                      Apply Limit
+                      {isApplyingBulkLimit ? 'Applying...' : 'Apply Limit'}
                   </Button>
-              </ModalFooter>
-          </ModalContent>
-      </Modal>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
 
       {/* Bulk Delete Confirmation Dialog */}
-      <AlertDialog
-        isOpen={isBulkDeleteOpen}
-        leastDestructiveRef={cancelRefBulkDelete}
-        onClose={onBulkDeleteClose}
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              <Flex align="center">
-                <Box as={FiAlertTriangle} color="red.500" mr={2} />
-                Delete Selected Vertex Targets? {/* Updated title */}
-              </Flex>
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              Are you sure you want to permanently delete the selected <strong>{selectedTargetIds.size}</strong> Vertex Target(s)? {/* Updated text */}
-              This action cannot be undone.
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button ref={cancelRefBulkDelete} onClick={onBulkDeleteClose} isDisabled={isDeletingBulk}>
-                Cancel
-              </Button>
-              <Button
-                colorScheme="red"
-                onClick={handleBulkDelete}
-                ml={3}
-                isLoading={isDeletingBulk}
-              >
-                Delete Targets {/* Updated button text */}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 mr-2 text-red-500" />
+              Delete Selected Vertex Targets?
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            Are you sure you want to permanently delete the selected <strong>{selectedTargetIds.size}</strong> Vertex Target(s)?
+            This action cannot be undone.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingBulk}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isDeletingBulk} className="bg-red-600 hover:bg-red-700">
+              {isDeletingBulk ? 'Deleting...' : 'Delete Targets'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
 
-    </Box>
+    </TooltipProvider>
   );
 }
