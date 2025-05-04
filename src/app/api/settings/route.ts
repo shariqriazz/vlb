@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logError } from '@/lib/services/logger';
-import { Settings, readSettings, writeSettings } from '@/lib/settings';
+import { Settings, readSettings, writeSettings, clearSettingsCache } from '@/lib/settings';
 
 // GET /api/settings - Get application settings
 export async function GET() {
@@ -23,22 +23,31 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const currentSettings = await readSettings();
-    
+
     console.log('Received settings update:', body); // Add logging to debug
-    
+
     // Validate and update settings
     const newSettings: Settings = {
-      keyRotationRequestCount: validateNumber(body.keyRotationRequestCount, currentSettings.keyRotationRequestCount, 1, 100),
-      maxFailureCount: validateNumber(body.maxFailureCount, currentSettings.maxFailureCount, 1, 20),
+      targetRotationRequestCount: validateNumber(
+        // Handle both old and new field names for backward compatibility
+        body.targetRotationRequestCount ?? body.keyRotationRequestCount,
+        currentSettings.targetRotationRequestCount,
+        1,
+        100
+      ),
+      maxFailureCount: validateNumber(body.maxFailureCount, currentSettings.maxFailureCount, 1, 1000), // Increased max limit from 20 to 1000
       rateLimitCooldown: validateNumber(body.rateLimitCooldown, currentSettings.rateLimitCooldown, 10, 3600),
       logRetentionDays: validateNumber(body.logRetentionDays, currentSettings.logRetentionDays, 1, 90),
-      maxRetries: validateNumber(body.maxRetries ?? currentSettings.maxRetries, currentSettings.maxRetries, 0, 10), // Use nullish coalescing for potentially undefined body.maxRetries
-      // endpoint: validateString(body.endpoint, currentSettings.endpoint), // Removed obsolete endpoint
+      maxRetries: validateNumber(body.maxRetries ?? currentSettings.maxRetries, currentSettings.maxRetries, 0, 10),
+      failoverDelaySeconds: validateNumber(body.failoverDelaySeconds ?? currentSettings.failoverDelaySeconds, currentSettings.failoverDelaySeconds, 0, 60),
     };
-    
+
     console.log('Saving settings:', newSettings); // Add logging to debug
-    
+
     await writeSettings(newSettings);
+
+    // Explicitly clear the cache to ensure fresh settings are used
+    clearSettingsCache();
 
     return NextResponse.json({
       message: 'Settings updated successfully',

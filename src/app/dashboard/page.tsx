@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  Stat, 
-  StatLabel, 
-  StatNumber, 
-  StatHelpText, 
-  Card, 
-  CardHeader, 
+import {
+  Box,
+  Heading,
+  Text,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Card,
+  CardHeader,
   CardBody,
   SimpleGrid,
   Icon,
@@ -72,8 +72,8 @@ export default function Dashboard() {
     try {
       // Fetch targets and stats concurrently
       const [targetsResponse, statsResponse] = await Promise.all([
-        fetch('/api/admin/targets'), // Fetch targets
-        fetch('/api/stats?timeRange=24h') // Fetch 24h stats
+        fetch('/api/admin/targets'),
+        fetch('/api/stats?timeRange=24h')
       ]);
 
       // Check responses
@@ -95,25 +95,26 @@ export default function Dashboard() {
       // Calculate stats based on fetched targets and stats data
       const totalTargets = fetchedTargets.length;
       const activeTargets = fetchedTargets.filter((target: VertexTarget) => target.isActive).length;
-      // Use lifetime totals from stats API (which sums target counts)
+
+      // Use data from stats API
       const totalRequests = statsData.totalRequests || 0;
       const totalRequestsToday = statsData.totalRequestsToday || 0;
-      const totalRequests24h = statsData.totalRequests24h || 0; // Last 24h from logs
-      const targetErrors24h = statsData.targetErrors || 0; // Target errors from logs (last 24h)
+      const totalRequests24h = statsData.requestData?.reduce((sum: number, item: any) => sum + item.requests, 0) || 0;
+      const targetErrors = statsData.targetErrors || 0;
       const avgResponseTime = statsData.avgResponseTime || 0;
 
-      // Calculate target error rate based on 24h requests
+      // Calculate target error rate
       const targetErrorRate = totalRequests24h > 0
-        ? ((targetErrors24h / totalRequests24h) * 100).toFixed(1)
-        : '0.0';
+        ? ((targetErrors / totalRequests24h) * 100)
+        : 0;
 
       setStats({
         totalTargets,
         activeTargets,
         totalRequests, // Lifetime
         totalRequestsToday, // Since midnight
-        totalRequests24h, // Last 24h
-        targetErrorRate: parseFloat(targetErrorRate),
+        totalRequests24h, // From stats API
+        targetErrorRate,
         avgResponseTime
       });
     } catch (err: any) {
@@ -160,7 +161,7 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3, xl: 6 }} spacing={6} mb={8}> {/* Adjusted grid columns */}
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 3, xl: 6 }} spacing={6} mb={8}>
         <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
           <CardBody>
             <Flex align="center" mb={2}>
@@ -191,61 +192,61 @@ export default function Dashboard() {
             </Flex>
           </CardBody>
         </Card>
-{/* New Card for Total Requests (Last 24 Hours) */}
-<Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-  <CardBody>
-    <Flex align="center" mb={2}>
-      <Icon as={FiCpu} boxSize={6} color="cyan.500" mr={2} /> {/* Different color */}
-      <Stat>
-        <StatLabel>Total Requests (24h)</StatLabel>
-        <StatNumber>{isLoading ? '-' : stats.totalRequests24h}</StatNumber>
-        <StatHelpText>Last 24 Hours (Logs)</StatHelpText>
-      </Stat>
-    </Flex>
-  </CardBody>
-</Card>
-
-        {/* New Card for Total Requests Today */}
+        {/* Card for Total Requests (24h) */}
         <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
           <CardBody>
             <Flex align="center" mb={2}>
-              <Icon as={FiCpu} boxSize={6} color="teal.500" mr={2} /> {/* Different color/icon? */}
+              <Icon as={FiCpu} boxSize={6} color="cyan.500" mr={2} />
               <Stat>
-                <StatLabel>Total Requests (Today)</StatLabel>
-                <StatNumber>{isLoading ? '-' : stats.totalRequestsToday}</StatNumber>
-                <StatHelpText>Since Midnight (DB)</StatHelpText>
+                <StatLabel>Total Requests (24h)</StatLabel>
+                <StatNumber>{isLoading ? '-' : stats.totalRequests24h}</StatNumber>
+                <StatHelpText>Last 24 Hours</StatHelpText>
               </Stat>
             </Flex>
           </CardBody>
         </Card>
-{/* Card for Total Requests (Lifetime) - Updated Label */}
-<Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-  <CardBody>
-    <Flex align="center" mb={2}>
-      <Icon as={FiCpu} boxSize={6} color="purple.500" mr={2} />
-      <Stat>
-        <StatLabel>Total Requests (Lifetime)</StatLabel>
-        <StatNumber>{isLoading ? '-' : stats.totalRequests}</StatNumber>
-        <StatHelpText>All Time (DB)</StatHelpText>
-      </Stat>
-    </Flex>
-  </CardBody>
-</Card>
 
-<Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
-  <CardBody>
-    <Flex align="center" mb={2}>
-      <Icon as={FiAlertCircle} boxSize={6} color="orange.500" mr={2} />
-      <Stat>
-        {/* Update Label */}
-        <StatLabel>Target Error Rate</StatLabel>
-        {/* Use targetErrorRate */}
-        <StatNumber>{isLoading ? '-' : `${stats.targetErrorRate}%`}</StatNumber>
-        <StatHelpText>Last 24 Hours (Logs)</StatHelpText>
-      </Stat>
-    </Flex>
-  </CardBody>
-</Card>
+        {/* Card for Total Requests Today */}
+        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
+          <CardBody>
+            <Flex align="center" mb={2}>
+              <Icon as={FiCpu} boxSize={6} color="teal.500" mr={2} />
+              <Stat>
+                <StatLabel>Total Requests (Today)</StatLabel>
+                <StatNumber>{isLoading ? '-' : stats.totalRequestsToday}</StatNumber>
+                <StatHelpText>Since Midnight</StatHelpText>
+              </Stat>
+            </Flex>
+          </CardBody>
+        </Card>
+
+        {/* Card for Total Requests (Lifetime) */}
+        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
+          <CardBody>
+            <Flex align="center" mb={2}>
+              <Icon as={FiCpu} boxSize={6} color="purple.500" mr={2} />
+              <Stat>
+                <StatLabel>Total Requests (Lifetime)</StatLabel>
+                <StatNumber>{isLoading ? '-' : stats.totalRequests}</StatNumber>
+                <StatHelpText>All Time</StatHelpText>
+              </Stat>
+            </Flex>
+          </CardBody>
+        </Card>
+
+        {/* Card for Target Error Rate */}
+        <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
+          <CardBody>
+            <Flex align="center" mb={2}>
+              <Icon as={FiAlertCircle} boxSize={6} color="orange.500" mr={2} />
+              <Stat>
+                <StatLabel>Target Error Rate</StatLabel>
+                <StatNumber>{isLoading ? '-' : `${stats.targetErrorRate.toFixed(1)}%`}</StatNumber>
+                <StatHelpText>Last 24 Hours</StatHelpText>
+              </Stat>
+            </Flex>
+          </CardBody>
+        </Card>
 </SimpleGrid>
 
       <Card bg={bgColor} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm" mb={8}>

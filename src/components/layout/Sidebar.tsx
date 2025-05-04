@@ -2,13 +2,13 @@
 
 import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import Link from 'next/link';
-import { 
-  Box, 
-  VStack, 
-  Heading, 
-  Text, 
-  Flex, 
-  Icon, 
+import {
+  Box,
+  VStack,
+  Heading,
+  Text,
+  Flex,
+  Icon,
   useColorModeValue,
   Button,
   Divider,
@@ -93,7 +93,7 @@ export default function Sidebar({ onResize }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   // Remove isClient state - no longer needed with this pattern
   // const [isClient, setIsClient] = useState(false);
-  
+
   const bg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
 
@@ -199,15 +199,15 @@ export default function Sidebar({ onResize }: SidebarProps) {
           </Flex>
 
           <VStack align="stretch" spacing={1}>
-            <NavItem 
-              icon={FiHome} 
-              href="/dashboard" 
+            <NavItem
+              icon={FiHome}
+              href="/dashboard"
               isActive={pathname === '/dashboard'}
               isCollapsed={isCollapsed}
             >
               Dashboard
             </NavItem>
-            
+
             <NavItem
               icon={FiTarget} // Changed icon
               href="/targets" // Changed href
@@ -216,29 +216,28 @@ export default function Sidebar({ onResize }: SidebarProps) {
             >
               Targets {/* Changed text */}
             </NavItem>
-            
+
             <NavItem
               icon={FiFileText}
-              href="/logs" 
+              href="/logs"
               isActive={pathname === '/logs'}
               isCollapsed={isCollapsed}
             >
               Logs
             </NavItem>
-            
-            <NavItem 
-              icon={FiBarChart2} 
-              href="/stats" 
+
+            <NavItem
+              icon={FiBarChart2}
+              href="/stats"
               isActive={pathname === '/stats'}
               isCollapsed={isCollapsed}
             >
               Statistics
             </NavItem>
-            
 
-            <NavItem 
-              icon={FiSettings} 
-              href="/settings" 
+            <NavItem
+              icon={FiSettings}
+              href="/settings"
               isActive={pathname === '/settings'}
               isCollapsed={isCollapsed}
             >

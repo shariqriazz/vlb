@@ -693,7 +693,19 @@ export async function POST(req: NextRequest) {
       if (isRetryable && retryCount < maxRetries - 1) {
         retryCount++;
         requestLogger.warn(`Attempt ${retryCount}/${maxRetries} failed for request ${requestId}. Retrying...`, { targetId: targetIdForAttempt, statusCode, errorType, errorMessage });
-        await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+
+        // Apply failover delay if this is a rate limit error
+        if (errorType === 'RateLimitError') {
+          const failoverDelayMs = (settings.failoverDelaySeconds || 0) * 1000;
+          if (failoverDelayMs > 0) {
+            requestLogger.info(`Applying failover delay of ${settings.failoverDelaySeconds}s before switching targets`, { requestId });
+            await new Promise(resolve => setTimeout(resolve, failoverDelayMs));
+          }
+        } else {
+          // For non-rate-limit errors, use the standard retry delay
+          await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+        }
+
         continue;
       } else {
           requestLogger.error(`Final error for request ${requestId} after ${retryCount + 1} attempts. Error: ${errorMessage}`, { targetId: targetIdForAttempt, statusCode, errorType });

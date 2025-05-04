@@ -2,15 +2,19 @@
 
 A modern NextJS application that serves as an OpenAI-compatible API load balancer specifically for Google Cloud Vertex AI backends. It provides target management, load balancing, and a UI to monitor usage and configure settings. This application allows you to efficiently manage multiple Vertex AI targets (Project ID, Location, Model ID, Service Account Key), automatically rotate between them, and monitor API usage with detailed statistics.
 
-![Vertex AI Load Balancer](https://cloud.google.com/static/vertex-ai/docs/generative-ai/images/architecture-for-llm-custom-model-training-and-serving.svg) <!-- Placeholder image, consider updating -->
+![Vertex AI Load Balancer](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ0Zip_9Sc-Y6BxhrBhZ770znyfGPcIc-48RQ&s)
 
 Thanks to @SannidhyaSah for the original OpenAI-compatible load balancer foundation.
 
 ## Features
 
-- **Vertex AI Target Management**: Add, remove, and monitor your Vertex AI targets (Project ID, Location, Model ID, Service Account Key JSON).
-- **Load Balancing**: Automatically rotate between active Vertex AI targets based on request count.
-- **Usage Statistics**: Monitor your Vertex AI API usage with detailed charts and metrics per target (requests, errors, response time, token counts).
+- **Vertex AI Target Management**: Add, edit, remove, enable/disable, and monitor your Vertex AI targets (Project ID, Location, Model ID, Service Account Key JSON, Daily Limits).
+- **Load Balancing Strategy**: Automatically selects the next healthy target using a hybrid approach:
+   - **Health Checks**: Avoids targets that are inactive, disabled by failures, disabled by daily limits, or in a rate-limit cooldown.
+   - **Prioritizes Unused**: Prefers available targets that have never been used.
+   - **Least Recently Used (LRU)**: If all available targets have been used, selects the one used least recently.
+   - **Forced Rotation**: Rotates to the next target after a configurable number of consecutive requests to the same target (see `keyRotationRequestCount` setting).
+- **Usage Statistics**: Monitor your Vertex AI API usage with detailed charts and metrics per target (requests, errors, response time, model usage). Charts display time in the user's local timezone.
 - **Logs Viewer**: View and search through request, error, and target management logs.
 - **Dark/Light Mode**: Toggle between dark and light themes.
 - **Single Command Execution**: Run both frontend and backend with a single command.
@@ -110,13 +114,14 @@ For optimal performance and reliability:
 
 - Add multiple targets across different regions or models if needed for resilience or specific use cases.
 - Ensure the Service Account Keys used have the minimum necessary permissions.
-- Regularly review target performance in the **Stats** page and deactivate or remove underperforming/erroring targets.
+- Regularly review target performance in the **Stats** page and disable or remove underperforming/erroring targets.
 
 ### Performance Settings (via Settings Page)
 
 - Configure target rotation request count (e.g., rotate after 5 requests per target).
 - Set appropriate cooldown periods for rate-limited targets.
-- Configure max failure count before a target is automatically deactivated.
+- Configure max failure count before a target is automatically disabled.
+- Set failover delay to control how long to wait before switching to another target when a rate limit is hit.
 
 ### Monitoring
 
@@ -138,7 +143,7 @@ For optimal performance and reliability:
 
 ## Running the Application
 
-**Important:** Before the first run after cloning or after major schema changes, delete any existing database file: `rm data/database.db`. The application will create a new one.
+**⚠️ Important:** Before the first run after cloning, **or if you encounter database errors after pulling updates**, delete any existing database file: `rm data/database.db` (or delete the file manually). The application will automatically create and initialize a new database file on startup.
 
 Development mode with hot reloading:
 

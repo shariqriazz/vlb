@@ -35,9 +35,12 @@ import {
   NumberDecrementStepper,
   // Add Checkbox
   Checkbox,
+  Select,
+  InputGroup,
+  InputRightElement,
 } from '@chakra-ui/react';
-import { FiRefreshCw, FiTrash2, FiEdit2, FiSettings, FiAlertTriangle, FiTarget } from 'react-icons/fi'; // Added FiTarget
-import { useRef, useMemo } from 'react'; // Add useMemo
+import { FiRefreshCw, FiTrash2, FiEdit2, FiSettings, FiAlertTriangle, FiTarget } from 'react-icons/fi';
+import { useRef, useMemo } from 'react';
 // Import modal components for editing
 import {
   Modal,
@@ -51,6 +54,7 @@ import {
   FormLabel,
   Input,
 } from '@chakra-ui/react';
+import { locationOptions, modelIdOptions } from '@/lib/constants/vertexOptions';
 
 // Updated interface for VertexTarget (matching TargetsPage)
 interface VertexTarget {
@@ -99,7 +103,11 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
   const [editNameValue, setEditNameValue] = useState('');
   const [editProjectIdValue, setEditProjectIdValue] = useState(''); // Added state
   const [editLocationValue, setEditLocationValue] = useState('');   // Added state
+  const [editLocationCustomValue, setEditLocationCustomValue] = useState('');
+  const [isEditCustomLocation, setIsEditCustomLocation] = useState(false);
   const [editModelIdValue, setEditModelIdValue] = useState('');     // Added state
+  const [editModelIdCustomValue, setEditModelIdCustomValue] = useState('');
+  const [isEditCustomModelId, setIsEditCustomModelId] = useState(false);
   const [editRateLimitValue, setEditRateLimitValue] = useState<string>('');
   const [isSavingChanges, setIsSavingChanges] = useState(false);
 
@@ -250,16 +258,65 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
     setEditingTarget(target); // Renamed state
     setEditNameValue(target.name || '');
     setEditProjectIdValue(target.projectId); // Set new state
-    setEditLocationValue(target.location);   // Set new state
-    setEditModelIdValue(target.modelId);     // Set new state
+
+    // Check if location is in predefined options
+    const locationExists = locationOptions.some(option => option.value === target.location);
+    if (locationExists) {
+      setEditLocationValue(target.location);
+      setIsEditCustomLocation(false);
+    } else {
+      setEditLocationValue('custom');
+      setEditLocationCustomValue(target.location);
+      setIsEditCustomLocation(true);
+    }
+
+    // Check if model ID is in predefined options
+    const modelIdExists = modelIdOptions.some(option => option.value === target.modelId);
+    if (modelIdExists) {
+      setEditModelIdValue(target.modelId);
+      setIsEditCustomModelId(false);
+    } else {
+      setEditModelIdValue('custom');
+      setEditModelIdCustomValue(target.modelId);
+      setIsEditCustomModelId(true);
+    }
+
     setEditRateLimitValue(target.dailyRateLimit?.toString() ?? '');
     onEditOpen();
+  };
+
+  // Handle location selection in edit modal
+  const handleEditLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+      setIsEditCustomLocation(true);
+      setEditLocationValue('custom');
+    } else {
+      setIsEditCustomLocation(false);
+      setEditLocationValue(value);
+    }
+  };
+
+  // Handle model ID selection in edit modal
+  const handleEditModelIdChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+      setIsEditCustomModelId(true);
+      setEditModelIdValue('custom');
+    } else {
+      setIsEditCustomModelId(false);
+      setEditModelIdValue(value);
+    }
   };
 
   // Function to save the edited changes
   const handleSaveTargetChanges = async () => { // Renamed function
     if (!editingTarget) return;
     setIsSavingChanges(true);
+
+    // Get the actual location and model ID values (either from dropdown or custom input)
+    const locationValue = isEditCustomLocation ? editLocationCustomValue.trim() : editLocationValue.trim();
+    const modelIdValue = isEditCustomModelId ? editModelIdCustomValue.trim() : editModelIdValue.trim();
 
     // --- Input Validation ---
     let rateLimitToSend: number | null = null;
@@ -275,7 +332,7 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
       rateLimitToSend = parsedLimit;
     }
     // Validate new fields
-    if (!editProjectIdValue.trim() || !editLocationValue.trim() || !editModelIdValue.trim()) {
+    if (!editProjectIdValue.trim() || !locationValue || !modelIdValue) {
          toast({ title: 'Invalid Input', description: 'Project ID, Location, and Model ID cannot be empty.', status: 'error', duration: 4000, isClosable: true });
          setIsSavingChanges(false);
          return;
@@ -286,8 +343,8 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
       const bodyToSend = {
         name: editNameValue.trim() || undefined,
         projectId: editProjectIdValue.trim(), // Add new field
-        location: editLocationValue.trim(),   // Add new field
-        modelId: editModelIdValue.trim(),     // Add new field
+        location: locationValue,   // Use the resolved location value
+        modelId: modelIdValue,     // Use the resolved model ID value
         dailyRateLimit: rateLimitToSend,
         // SA Key JSON is NOT updated via this PUT request
       };
@@ -552,9 +609,9 @@ return (
                     <Td><Skeleton height="20px" width="100px" /></Td>
                   </Tr>
                 ))
-              : targets.length === 0 // Use targets state
-              ? /* No Targets State */
-                <Tr>
+             : !Array.isArray(targets) || targets.length === 0 // Check if it's an array AND empty
+             ? /* No Targets State */
+               <Tr>
                   <Td colSpan={12} textAlign="center" py={4}> {/* Updated colSpan */}
                     No Vertex targets found. Add a target to get started. {/* Updated text */}
                   </Td>
@@ -654,20 +711,78 @@ return (
 
              <FormControl isRequired mb={4}> {/* Location */}
               <FormLabel>Location</FormLabel>
-              <Input
-                placeholder="us-central1"
-                value={editLocationValue}
-                onChange={(e) => setEditLocationValue(e.target.value)}
-              />
+              {!isEditCustomLocation ? (
+                <Select
+                  placeholder="Select location"
+                  value={editLocationValue}
+                  onChange={handleEditLocationChange}
+                >
+                  {locationOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                  <option value="custom">Custom location...</option>
+                </Select>
+              ) : (
+                <InputGroup>
+                  <Input
+                    placeholder="Enter custom location (e.g., us-central1)"
+                    value={editLocationCustomValue}
+                    onChange={(e) => setEditLocationCustomValue(e.target.value)}
+                  />
+                  <InputRightElement width="4.5rem">
+                    <Button
+                      h="1.75rem"
+                      size="sm"
+                      onClick={() => {
+                        setIsEditCustomLocation(false);
+                        setEditLocationValue('');
+                      }}
+                    >
+                      Back
+                    </Button>
+                  </InputRightElement>
+                </InputGroup>
+              )}
             </FormControl>
 
              <FormControl isRequired mb={4}> {/* Model ID */}
               <FormLabel>Model ID</FormLabel>
-              <Input
-                placeholder="gemini-2.5-pro-exp-03-25"
-                value={editModelIdValue}
-                onChange={(e) => setEditModelIdValue(e.target.value)}
-              />
+              {!isEditCustomModelId ? (
+                <Select
+                  placeholder="Select model ID"
+                  value={editModelIdValue}
+                  onChange={handleEditModelIdChange}
+                >
+                  {modelIdOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                  <option value="custom">Custom model ID...</option>
+                </Select>
+              ) : (
+                <InputGroup>
+                  <Input
+                    placeholder="Enter custom model ID (e.g., gemini-2.5-pro)"
+                    value={editModelIdCustomValue}
+                    onChange={(e) => setEditModelIdCustomValue(e.target.value)}
+                  />
+                  <InputRightElement width="4.5rem">
+                    <Button
+                      h="1.75rem"
+                      size="sm"
+                      onClick={() => {
+                        setIsEditCustomModelId(false);
+                        setEditModelIdValue('');
+                      }}
+                    >
+                      Back
+                    </Button>
+                  </InputRightElement>
+                </InputGroup>
+              )}
             </FormControl>
 
             {/* Daily Rate Limit Input */}

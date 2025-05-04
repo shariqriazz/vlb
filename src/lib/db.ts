@@ -11,20 +11,22 @@ const DB_FILE = path.join(DATA_DIR, 'database.db');
 
 // Define the Settings interface (can be shared or redefined if needed)
 export interface Settings {
-  keyRotationRequestCount: number;
+  targetRotationRequestCount: number; // Renamed from keyRotationRequestCount
   maxFailureCount: number;
   rateLimitCooldown: number; // seconds
   logRetentionDays: number;
   maxRetries: number;
+  failoverDelaySeconds: number; // New setting to control delay before switching to next target
 }
 
-// Define DEFAULT_SETTINGS with the endpoint field
+// Define DEFAULT_SETTINGS
 export const DEFAULT_SETTINGS: Settings = {
-  keyRotationRequestCount: 10,
+  targetRotationRequestCount: 10, // Renamed from keyRotationRequestCount
   maxFailureCount: 3,
   rateLimitCooldown: 60, // 60 seconds
   logRetentionDays: 30,
   maxRetries: 3,
+  failoverDelaySeconds: 2, // Default to 2 seconds delay before switching targets
 };
 
 
@@ -108,6 +110,9 @@ async function initializeDatabase(): Promise<Database> {
       promptTokens INTEGER, -- Added
       completionTokens INTEGER, -- Added
       totalTokens INTEGER, -- Added
+      isStreaming BOOLEAN, -- Added
+      requestId TEXT, -- Added
+      requestedModel TEXT, -- Added
       FOREIGN KEY (targetId) REFERENCES vertex_targets(_id) ON DELETE CASCADE -- Enforce FK and cascade deletes
     );
   `);

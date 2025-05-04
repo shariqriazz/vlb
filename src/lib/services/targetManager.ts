@@ -69,7 +69,7 @@ class TargetManager {
             updatedTargetsMap.set(target._id, target); // Store the updated target instance
         }
       }
-      
+
       // If any targets were reset, perform a single bulk write
       if (targetsWereReset) {
           await VertexTarget.bulkUpdate(updatedTargetsMap);
@@ -197,16 +197,16 @@ class TargetManager {
       }
 
       targetToUpdate.failureCount += 1;
-      
+
       // Fetch current settings to get the threshold
       const settings = await readSettings();
       const maxFailures = settings.maxFailureCount;
 
-      // If too many failures, deactivate the target
+      // If too many failures, disable the target
       if (targetToUpdate.failureCount >= maxFailures) {
         targetToUpdate.isActive = false;
 
-        logTargetEvent('Target Deactivated', { // Use logTargetEvent
+        logTargetEvent('Target Disabled', { // Use logTargetEvent
           targetId: targetToUpdate._id, // Corrected variable name
           projectId: targetToUpdate.projectId, // Log relevant target info
           location: targetToUpdate.location,
@@ -221,11 +221,10 @@ class TargetManager {
             this.currentTarget = null;
         }
       } else {
-        // If not deactivated, save the incremented failure count
-        // If not deactivated, save the incremented failure count
+        // If not disabled, save the incremented failure count
         await targetToUpdate.save();
       }
-      
+
       return false; // Indicate it was not a rate limit error
       } catch (error: any) {
         logError(error, {

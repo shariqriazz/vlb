@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { readSettings } from '@/lib/settings'; // Import readSettings from lib
 import { logError, logKeyEvent } from '@/lib/services/logger'; // Use logKeyEvent for now
+import { getDb } from '@/lib/db'; // Import getDb for database operations
 
 // Function to parse date from log filename (similar to stats route)
 function parseDateFromFilename(filename: string): Date | null {
@@ -26,6 +27,40 @@ export async function POST() { // Use POST for actions with side effects
       return NextResponse.json({ message: 'Log retention is disabled (retention days <= 0). No files deleted.' });
     }
 
+    // Set cutoffDate to the beginning of the day, retentionDays ago (UTC)
+    const cutoffDate = new Date();
+    cutoffDate.setUTCHours(0, 0, 0, 0);
+    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - retentionDays);
+
+    // Format cutoff date for SQL query (ISO string)
+    const cutoffDateISO = cutoffDate.toISOString();
+
+    // Initialize counters and error collection
+    let deletedFileCount = 0;
+    let deletedDbLogCount = 0;
+    const errors: string[] = [];
+
+    // 1. Clean up database logs
+    try {
+      const db = await getDb();
+      const result = await db.run(
+        `DELETE FROM request_logs WHERE timestamp < ?`,
+        cutoffDateISO
+      );
+
+      deletedDbLogCount = result.changes || 0;
+      logKeyEvent('Admin Action', {
+        action: 'Deleted old database logs',
+        count: deletedDbLogCount,
+        cutoffDate: cutoffDateISO
+      });
+    } catch (error: any) {
+      const errorMessage = `Failed to delete database logs: ${error.message}`;
+      logError(error, { context: 'Log Cleanup - Database' });
+      errors.push(errorMessage);
+    }
+
+    // 2. Clean up file-based logs
     const logsDir = path.join(process.cwd(), 'logs');
     let files: string[] = [];
 
@@ -33,19 +68,14 @@ export async function POST() { // Use POST for actions with side effects
       files = await fs.readdir(logsDir);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        logKeyEvent('Admin Action', { action: 'Log cleanup skipped', reason: 'Logs directory does not exist.' });
-        return NextResponse.json({ message: 'Logs directory not found. No files to delete.' });
+        logKeyEvent('Admin Action', { action: 'File log cleanup skipped', reason: 'Logs directory does not exist.' });
+        // Continue with the process since we might have cleaned up database logs
+      } else {
+        const errorMessage = `Failed to read logs directory: ${error.message}`;
+        logError(error, { context: 'Log Cleanup - Files' });
+        errors.push(errorMessage);
       }
-      throw error; // Re-throw other errors
     }
-
-    const cutoffDate = new Date();
-    // Set cutoffDate to the beginning of the day, retentionDays ago (UTC)
-    cutoffDate.setUTCHours(0, 0, 0, 0);
-    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - retentionDays);
-
-    let deletedCount = 0;
-    const errors: string[] = [];
 
     for (const file of files) {
       // Skip key logs - IMPORTANT: Preserve key logs for usage statistics
@@ -63,19 +93,24 @@ export async function POST() { // Use POST for actions with side effects
         const filePath = path.join(logsDir, file);
         try {
           await fs.unlink(filePath);
-          deletedCount++;
+          deletedFileCount++;
           logKeyEvent('Admin Action', { action: 'Deleted old log file', file: file });
         } catch (error: any) {
           const errorMessage = `Failed to delete log file ${file}: ${error.message}`;
-          logError(error, { context: 'Log Cleanup', file: file }); // Keep using logError for errors
+          logError(error, { context: 'Log Cleanup - Files', file: file });
           errors.push(errorMessage);
         }
       }
     }
 
     const summary = {
-      message: `Log cleanup finished. Deleted ${deletedCount} files older than ${retentionDays} days.`,
-      deletedCount,
+      message: `Log cleanup finished. Deleted ${deletedDbLogCount} database records and ${deletedFileCount} files older than ${retentionDays} days.`,
+      database: {
+        deletedCount: deletedDbLogCount,
+      },
+      files: {
+        deletedCount: deletedFileCount,
+      },
       retentionDays,
       cutoffDate: cutoffDate.toISOString().split('T')[0], // Show YYYY-MM-DD
       errors,
@@ -83,7 +118,8 @@ export async function POST() { // Use POST for actions with side effects
 
     logKeyEvent('Admin Action', {
       action: 'Log cleanup finished',
-      deletedCount: deletedCount,
+      deletedDbLogCount,
+      deletedFileCount,
       errorCount: errors.length
     });
     return NextResponse.json(summary);

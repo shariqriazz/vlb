@@ -90,23 +90,25 @@ export async function POST(req: NextRequest) {
 
       // Import Vertex Targets
       if (importData.data.vertex_targets) { // Changed api_keys to vertex_targets
-        // Updated INSERT statement for vertex_targets table
+        // Updated INSERT statement for vertex_targets table with correct column names
         const stmtTargets = await db.prepare(
-          `INSERT INTO vertex_targets (_id, projectId, location, modelId, serviceAccountKeyJson, name, isActive, lastUsed, failureCount, requestCount, dailyRequestsUsed, lastResetDate, isDisabledByFailure)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO vertex_targets (_id, projectId, location, modelId, serviceAccountKeyJson, name, isActive, lastUsed, failureCount, requestCount, dailyRequestsUsed, lastResetDate, isDisabledByRateLimit, rateLimitResetAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
-        for (const target of importData.data.vertex_targets) { // Changed key to target
+        for (const target of importData.data.vertex_targets) {
           // Add basic validation if needed, or rely on DB constraints
-          await stmtTargets.run( // Changed stmtKeys to stmtTargets
+          await stmtTargets.run(
             target._id, target.projectId, target.location, target.modelId,
-            target.serviceAccountKeyJson, // Assuming this is stored directly
+            target.serviceAccountKeyJson,
             target.name,
             booleanToDb(target.isActive), // Convert boolean
             target.lastUsed,
             target.failureCount ?? 0, target.requestCount ?? 0,
             target.dailyRequestsUsed ?? 0,
             target.lastResetDate,
-            booleanToDb(target.isDisabledByFailure) // Convert boolean
+            // Handle both old and new field names for backward compatibility
+            booleanToDb(target.isDisabledByRateLimit ?? target.isDisabledByFailure ?? false),
+            target.rateLimitResetAt ?? null
           );
           results.targets++; // Renamed keys to targets
         }

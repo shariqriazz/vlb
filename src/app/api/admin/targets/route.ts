@@ -26,7 +26,8 @@ export async function GET() {
       isDisabledByRateLimit: targetInstance.isDisabledByRateLimit,
     }));
 
-    return NextResponse.json(responseTargets);
+    // Return the array wrapped in an object with a 'targets' key
+    return NextResponse.json({ targets: responseTargets });
   } catch (error: any) {
     logError(error, { context: "GET /api/admin/targets" });
     return NextResponse.json(

@@ -139,8 +139,10 @@ const LogsPage = () => {
   }, [toast]);
 
   useEffect(() => {
-    fetchAppErrorStats();
-  }, [fetchAppErrorStats]);
+    if (isClient) {
+      fetchAppErrorStats();
+    }
+  }, [isClient, fetchAppErrorStats]);
 
   // Basic debounce for search input
   useEffect(() => {
@@ -198,7 +200,6 @@ const LogsPage = () => {
                 <StatNumber>
                   {!isClient ? 0 : statsLoading ? <Spinner size="sm" /> : statsError ? 'Error' : otherApplicationErrors}
                 </StatNumber>
-                {/* Update help text */}
                 <StatHelpText>Total errors excluding target failures</StatHelpText>
               </Stat>
             </CardBody>

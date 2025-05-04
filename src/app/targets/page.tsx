@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -17,6 +17,10 @@ import {
   FormControl,
   FormLabel,
   Input,
+  Select,
+  InputGroup,
+  InputRightElement,
+  IconButton,
   useToast,
   Flex,
   Spinner,
@@ -25,9 +29,10 @@ import {
   AlertTitle,
   AlertDescription,
 } from '@chakra-ui/react';
-import { FiPlus, FiTarget } from 'react-icons/fi'; // Added FiTarget
+import { FiPlus, FiTarget, FiEdit } from 'react-icons/fi';
 import AppLayout from '@/components/layout/AppLayout';
-import TargetStats from '@/components/targets/TargetStats'; // Updated path and component name
+import TargetStats from '@/components/targets/TargetStats';
+import { locationOptions, modelIdOptions } from '@/lib/constants/vertexOptions';
 
 // Updated interface for VertexTarget
 interface VertexTarget {
@@ -56,7 +61,11 @@ export default function TargetsPage() { // Renamed component
   const [newName, setNewName] = useState('');
   const [newProjectId, setNewProjectId] = useState('');
   const [newLocation, setNewLocation] = useState('');
+  const [newLocationCustom, setNewLocationCustom] = useState('');
+  const [isCustomLocation, setIsCustomLocation] = useState(false);
   const [newModelId, setNewModelId] = useState('');
+  const [newModelIdCustom, setNewModelIdCustom] = useState('');
+  const [isCustomModelId, setIsCustomModelId] = useState(false);
   const [newDailyRateLimit, setNewDailyRateLimit] = useState('');
   const [newSaKeyFile, setNewSaKeyFile] = useState<File | null>(null); // State for file upload
 
@@ -72,7 +81,8 @@ export default function TargetsPage() { // Renamed component
         throw new Error(`Error fetching targets: ${response.statusText}`); // Updated error message
       }
       const data = await response.json();
-      setTargets(data); // Update state with targets
+      // Extract the 'targets' array from the response object
+      setTargets(data.targets || []); // Update state with targets array, fallback to empty array
     } catch (err: any) {
       setError(err.message || 'Failed to fetch Vertex targets'); // Updated error message
       console.error('Error fetching targets:', err); // Updated log message
@@ -86,8 +96,12 @@ export default function TargetsPage() { // Renamed component
   }, []);
 
   const handleAddTarget = async () => { // Renamed function
+    // Get the actual location and model ID values (either from dropdown or custom input)
+    const locationValue = isCustomLocation ? newLocationCustom.trim() : newLocation.trim();
+    const modelIdValue = isCustomModelId ? newModelIdCustom.trim() : newModelId.trim();
+
     // Validation for required fields
-    if (!newProjectId.trim() || !newLocation.trim() || !newModelId.trim() || !newSaKeyFile) {
+    if (!newProjectId.trim() || !locationValue || !modelIdValue || !newSaKeyFile) {
       toast({
         title: 'Error',
         description: 'Project ID, Location, Model ID, and Service Account Key file are required.',
@@ -102,8 +116,8 @@ export default function TargetsPage() { // Renamed component
     const formData = new FormData();
     formData.append('name', newName.trim());
     formData.append('projectId', newProjectId.trim());
-    formData.append('location', newLocation.trim());
-    formData.append('modelId', newModelId.trim());
+    formData.append('location', locationValue);
+    formData.append('modelId', modelIdValue);
     // Append rate limit only if it's a valid number, otherwise backend handles default (null)
     const rateLimitNum = parseInt(newDailyRateLimit.trim(), 10);
     if (!isNaN(rateLimitNum) && rateLimitNum >= 0) {
@@ -147,7 +161,11 @@ export default function TargetsPage() { // Renamed component
       setNewName('');
       setNewProjectId('');
       setNewLocation('');
+      setNewLocationCustom('');
+      setIsCustomLocation(false);
       setNewModelId('');
+      setNewModelIdCustom('');
+      setIsCustomModelId(false);
       setNewDailyRateLimit('');
       setNewSaKeyFile(null);
       // Reset file input visually (optional, might need ref)
@@ -173,6 +191,30 @@ export default function TargetsPage() { // Renamed component
       setNewSaKeyFile(event.target.files[0]);
     } else {
       setNewSaKeyFile(null);
+    }
+  };
+
+  // Handle location selection
+  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+      setIsCustomLocation(true);
+      setNewLocation('custom');
+    } else {
+      setIsCustomLocation(false);
+      setNewLocation(value);
+    }
+  };
+
+  // Handle model ID selection
+  const handleModelIdChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+      setIsCustomModelId(true);
+      setNewModelId('custom');
+    } else {
+      setIsCustomModelId(false);
+      setNewModelId(value);
     }
   };
 
@@ -231,19 +273,77 @@ export default function TargetsPage() { // Renamed component
             </FormControl>
              <FormControl isRequired mb={4}>
               <FormLabel>Location</FormLabel>
-              <Input
-                placeholder="us-central1"
-                value={newLocation}
-                onChange={(e) => setNewLocation(e.target.value)}
-              />
+              {!isCustomLocation ? (
+                <Select
+                  placeholder="Select location"
+                  value={newLocation}
+                  onChange={handleLocationChange}
+                >
+                  {locationOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                  <option value="custom">Custom location...</option>
+                </Select>
+              ) : (
+                <InputGroup>
+                  <Input
+                    placeholder="Enter custom location (e.g., us-central1)"
+                    value={newLocationCustom}
+                    onChange={(e) => setNewLocationCustom(e.target.value)}
+                  />
+                  <InputRightElement width="4.5rem">
+                    <Button
+                      h="1.75rem"
+                      size="sm"
+                      onClick={() => {
+                        setIsCustomLocation(false);
+                        setNewLocation('');
+                      }}
+                    >
+                      Back
+                    </Button>
+                  </InputRightElement>
+                </InputGroup>
+              )}
             </FormControl>
              <FormControl isRequired mb={4}>
               <FormLabel>Model ID</FormLabel>
-              <Input
-                placeholder="gemini-2.5-pro-exp-03-25"
-                value={newModelId}
-                onChange={(e) => setNewModelId(e.target.value)}
-              />
+              {!isCustomModelId ? (
+                <Select
+                  placeholder="Select model ID"
+                  value={newModelId}
+                  onChange={handleModelIdChange}
+                >
+                  {modelIdOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                  <option value="custom">Custom model ID...</option>
+                </Select>
+              ) : (
+                <InputGroup>
+                  <Input
+                    placeholder="Enter custom model ID (e.g., gemini-2.5-pro)"
+                    value={newModelIdCustom}
+                    onChange={(e) => setNewModelIdCustom(e.target.value)}
+                  />
+                  <InputRightElement width="4.5rem">
+                    <Button
+                      h="1.75rem"
+                      size="sm"
+                      onClick={() => {
+                        setIsCustomModelId(false);
+                        setNewModelId('');
+                      }}
+                    >
+                      Back
+                    </Button>
+                  </InputRightElement>
+                </InputGroup>
+              )}
             </FormControl>
              <FormControl isRequired mb={4}>
               <FormLabel>Service Account Key (JSON)</FormLabel>

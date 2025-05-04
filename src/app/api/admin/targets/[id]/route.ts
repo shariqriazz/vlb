@@ -73,16 +73,16 @@ export async function PATCH(
       target.failureCount = 0; // Reset failure count
       target.rateLimitResetAt = null; // Clear global rate limit cooldown
       target.isDisabledByRateLimit = false; // Ensure it's not marked as disabled by daily limit
-      logTargetEvent('Target Reactivated', { targetId: target._id, reason: 'Manual activation' });
+      logTargetEvent('Target Enabled', { targetId: target._id, reason: 'Manual activation' });
     } else if (wasActive && !target.isActive) {
-      logTargetEvent('Target Deactivated', { targetId: target._id, reason: 'Manual deactivation' });
+      logTargetEvent('Target Disabled', { targetId: target._id, reason: 'Manual disabling' });
     }
 
     // Save the changes
     await target.save();
 
     return NextResponse.json({
-      message: `Vertex Target ${target.isActive ? 'activated' : 'deactivated'} successfully`,
+      message: `Vertex Target ${target.isActive ? 'enabled' : 'disabled'} successfully`,
       isActive: target.isActive
     });
   } catch (error: any) {

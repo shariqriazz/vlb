@@ -39,31 +39,25 @@ import AppLayout from '@/components/layout/AppLayout'; // Import AppLayout
 import { useContext } from 'react';
 import { ThemeContext } from '@/contexts/ThemeContext';
 
-import { SettingsForm } from '@/components/settings/SettingsForm';
-// Remove the AdminLayout import since it's not being used
-// import { AdminLayout } from '@/components/layout/AdminLayout';
-// import { EndpointSetting } from '@/components/settings/EndpointSetting'; // Removed obsolete import
-
 interface Settings {
-  // targetRotationRequestCount: number; // Renamed in db.ts, ensure API/fetch reflects this if needed
-  keyRotationRequestCount: number; // Keep original name for now, assuming API uses this
+  targetRotationRequestCount: number;
   maxFailureCount: number;
   rateLimitCooldown: number;
   logRetentionDays: number;
-  // endpoint: string; // Removed obsolete endpoint field
-  maxRetries?: number; // Add missing field from db.ts? Check API first.
+  maxRetries: number;
+  failoverDelaySeconds: number;
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    keyRotationRequestCount: 5,
+    targetRotationRequestCount: 5,
     maxFailureCount: 5,
     rateLimitCooldown: 60,
     logRetentionDays: 14,
-    // endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai', // Removed obsolete endpoint field
-    maxRetries: 3, // Add default if needed, check API first
+    maxRetries: 3,
+    failoverDelaySeconds: 2,
   });
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,23 +67,23 @@ export default function SettingsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null); // State for import file
   const [isImporting, setIsImporting] = useState(false); // State for import button
   const [importResult, setImportResult] = useState<{ message: string; details?: any } | null>(null); // State for import result message
-  
+
   const toast = useToast();
   const { colorMode, toggleColorMode } = useContext(ThemeContext);
-  
+
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
 
   const fetchSettings = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch('/api/settings');
       if (!response.ok) {
         throw new Error(`Error fetching settings: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       setSettings(data);
     } catch (err: any) {
@@ -106,7 +100,7 @@ export default function SettingsPage() {
       setIsLoading(false);
     }
   };
-  
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -115,7 +109,7 @@ export default function SettingsPage() {
     setIsSaving(true);
     setError(null);
     setIsSaved(false);
-    
+
     try {
       const response = await fetch('/api/settings', {
         method: 'POST',
@@ -124,16 +118,16 @@ export default function SettingsPage() {
         },
         body: JSON.stringify(settings),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to save settings');
       }
-      
+
       const data = await response.json();
       setSettings(data.settings);
       setIsSaved(true);
-      
+
       toast({
         title: 'Settings saved',
         description: 'Your settings have been updated successfully',
@@ -323,32 +317,20 @@ export default function SettingsPage() {
           </Alert>
         )}
 
-        {/* Removed the obsolete API Endpoint Configuration card */}
-        {/* <Card bg={cardBg} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm" mb={6}>
-          <CardHeader>
-            <Heading size="md">API Endpoint Configuration</Heading>
-          </CardHeader>
-          <Divider borderColor={borderColor} />
-          <CardBody>
-            <EndpointSetting
-              value={settings.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai'}
-              onChange={(value) => setSettings({ ...settings, endpoint: value })}
-            />
-          </CardBody>
-        </Card> */}
+
 
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={6} mb={6}> {/* Adjusted grid columns and added margin */}
           <Card bg={cardBg} borderWidth="1px" borderColor={borderColor} borderRadius="lg" shadow="sm">
             <CardHeader>
-              <Heading size="md">API Key Settings</Heading>
+              <Heading size="md">Target Settings</Heading>
             </CardHeader>
             <Divider borderColor={borderColor} />
             <CardBody>
               <FormControl mb={4}>
-                <FormLabel>Key Rotation Request Count</FormLabel>
+                <FormLabel>Target Rotation Request Count</FormLabel>
                 <NumberInput
-                  value={settings.keyRotationRequestCount}
-                  onChange={(_, value) => setSettings({ ...settings, keyRotationRequestCount: value })}
+                  value={settings.targetRotationRequestCount}
+                  onChange={(_, value) => setSettings({ ...settings, targetRotationRequestCount: value })}
                   min={1}
                   max={100}
                 >
@@ -359,7 +341,7 @@ export default function SettingsPage() {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  Number of requests before rotating to the next API key
+                  Number of requests before rotating to the next target
                 </Text>
               </FormControl>
 
@@ -369,7 +351,7 @@ export default function SettingsPage() {
                   value={settings.maxFailureCount}
                   onChange={(_, value) => setSettings({ ...settings, maxFailureCount: value })}
                   min={1}
-                  max={100}
+                  max={1000} // Increased from 100 to 1000 to allow higher values
                 >
                   <NumberInputField />
                   <NumberInputStepper>
@@ -378,7 +360,7 @@ export default function SettingsPage() {
                   </NumberInputStepper>
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
-                  Number of failures before deactivating an API key
+                  Number of failures before disabling a target
                 </Text>
               </FormControl>
 
@@ -398,6 +380,25 @@ export default function SettingsPage() {
                 </NumberInput>
                 <Text fontSize="sm" color="gray.500" mt={1}>
                   Default cooldown period when rate limit is hit (if not specified by API)
+                </Text>
+              </FormControl>
+
+              <FormControl mb={4}>
+                <FormLabel>Failover Delay (seconds)</FormLabel>
+                <NumberInput
+                  value={settings.failoverDelaySeconds}
+                  onChange={(_, value) => setSettings({ ...settings, failoverDelaySeconds: value })}
+                  min={0}
+                  max={60}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  Delay in seconds before switching to another target when a rate limit is hit (0 for immediate switch)
                 </Text>
               </FormControl>
             </CardBody>
@@ -449,7 +450,7 @@ export default function SettingsPage() {
 
               <FormControl display="flex" alignItems="center" mb={4}>
                 <FormLabel mb="0">Dark Mode</FormLabel>
-                <Switch 
+                <Switch
                   isChecked={colorMode === 'dark'}
                   onChange={toggleColorMode}
                 />

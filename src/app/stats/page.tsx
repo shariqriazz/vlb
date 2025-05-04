@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react"; // Added useMemo
+import { format, parseISO } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz'; // Corrected function name based on TS error
 import {
   Box,
   Heading,
@@ -48,20 +50,36 @@ import {
   Cell,
 } from "recharts";
 import { FiRefreshCw } from "react-icons/fi";
-import AppLayout from "@/components/layout/AppLayout"; // Import AppLayout
+import AppLayout from "@/components/layout/AppLayout";
+
+// --- Timezone Formatting Helper ---
+const formatInTimeZone = (dateInput: string | Date, tz: string, fmt: string): string => {
+  try {
+    const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+    const zonedDate = toZonedTime(date, tz); // Corrected function name based on TS error
+    return format(zonedDate, fmt);
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    // Fallback to ISO string part if formatting fails
+    return typeof dateInput === 'string' ? dateInput.substring(0, 10) : 'Invalid Date';
+  }
+};
+// --- End Timezone Formatting Helper ---
+
 
 export default function StatsPage() {
   const [timeRange, setTimeRange] = useState("7d");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
+  const [userTimeZone, setUserTimeZone] = useState<string>('UTC'); // State for user timezone, default UTC
 
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const lineColor = useColorModeValue("#3182CE", "#63B3ED");
   const errorColor = useColorModeValue("#E53E3E", "#FC8181");
   const toast = useToast();
-  const axisTickColor = useColorModeValue("gray.700", "#FFFFFF"); // Explicit white for dark mode
+  const axisTickColor = useColorModeValue("gray.700", "#FFFFFF");
 
   // Colors for pie charts
   const COLORS = [
@@ -100,29 +118,45 @@ export default function StatsPage() {
   };
 
   useEffect(() => {
+    // Get user's timezone on component mount
+    setUserTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
     fetchStats();
-  }, [timeRange]);
+  }, [timeRange]); // fetchStats dependency removed as it causes infinite loop if not memoized
 
-  // Handle case when stats is null
-  if (!isLoading && !error && !stats) {
-    return (
-      <AppLayout> {/* Use AppLayout for no-data state */}
-        <Box p={6}> {/* Wrap content in a Box or Fragment if needed */}
-          <Alert status="info">
-            <AlertIcon />
-            <AlertTitle>No Data</AlertTitle>
-            <AlertDescription>
-              No statistics data is available yet. Make some API requests to
-              generate statistics.
-            </AlertDescription>
-          </Alert>
-        </Box>
-      </AppLayout>
-    );
-  }
+  // Custom tooltip formatter for charts
+  const formatTooltipValue = (value: number) => {
+    return value.toLocaleString();
+  };
+
+  // Format percentage for display
+  const formatPercentage = (value: number) => {
+    return `${value.toFixed(1)}%`;
+  };
+
+  // --- Memoized Formatted Data ---
+  const formattedRequestData = useMemo(() => {
+    if (!stats?.requestData) return [];
+    const formatString = timeRange === '24h' ? 'HH:mm' : 'yyyy-MM-dd';
+    return stats.requestData.map((item: any) => ({
+      ...item,
+      localTimeLabel: formatInTimeZone(item.name, userTimeZone, formatString), // Use original 'name' (date string)
+      originalUtcTime: item.name // Keep original UTC time if needed for tooltip
+    }));
+  }, [stats?.requestData, userTimeZone, timeRange]);
+
+  const formattedHourlyData = useMemo(() => {
+    if (!stats?.hourlyData) return [];
+    return stats.hourlyData.map((item: any) => ({
+      ...item,
+      localTimeLabel: formatInTimeZone(item.hour, userTimeZone, 'HH:mm'), // Use 'hour' (ISO string)
+      originalUtcTime: item.hour // Keep original UTC time if needed for tooltip
+    }));
+  }, [stats?.hourlyData, userTimeZone]);
+  // --- End Memoized Formatted Data ---
+
 
   return (
-    <AppLayout> {/* Use AppLayout for main content */}
+    <AppLayout>
       <Flex justify="space-between" align="center" mb={6}>
         <Box>
           <Heading size="lg">Usage Statistics</Heading>
@@ -178,8 +212,25 @@ export default function StatsPage() {
                 <Stat>
                   <StatLabel>Total Requests</StatLabel>
                   <StatNumber>
-                    {/* Use totalRequests24h for consistency with other stats in this period */}
-                    {(stats.totalRequests24h ?? 0).toLocaleString()}
+                    {stats.totalRequests.toLocaleString()}
+                  </StatNumber>
+                  <StatHelpText>Lifetime total</StatHelpText>
+                </Stat>
+              </CardBody>
+            </Card>
+
+            <Card
+              bg={cardBg}
+              borderWidth="1px"
+              borderColor={borderColor}
+              borderRadius="lg"
+              shadow="sm"
+            >
+              <CardBody>
+                <Stat>
+                  <StatLabel>Success Rate</StatLabel>
+                  <StatNumber>
+                    {formatPercentage(stats.successRate)}
                   </StatNumber>
                   <StatHelpText>In selected period</StatHelpText>
                 </Stat>
@@ -195,30 +246,8 @@ export default function StatsPage() {
             >
               <CardBody>
                 <Stat>
-                  <StatLabel>Error Rate</StatLabel>
-                  <StatNumber>
-                    {/* Use targetErrors and totalRequests24h */}
-                    {(stats.totalRequests24h ?? 0) > 0 && stats.targetErrors !== undefined
-                      ? ((stats.targetErrors / stats.totalRequests24h) * 100).toFixed(1)
-                      : '0.0'}%
-                  </StatNumber>
-                  {/* Use targetErrors */}
-                  <StatHelpText>{stats.targetErrors ?? 0} target errors</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-
-            <Card
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="lg"
-              shadow="sm"
-            >
-              <CardBody>
-                <Stat>
                   <StatLabel>Avg Response Time</StatLabel>
-                  <StatNumber>{stats.avgResponseTime}ms</StatNumber>
+                  <StatNumber>{Math.round(stats.avgResponseTime)}ms</StatNumber>
                   <StatHelpText>Across successful requests</StatHelpText>
                 </Stat>
               </CardBody>
@@ -233,222 +262,98 @@ export default function StatsPage() {
             >
               <CardBody>
                 <Stat>
-                  {/* Update label */}
                   <StatLabel>Active Targets</StatLabel>
-                  {/* Use targetUsageData */}
-                  <StatNumber>{stats.targetUsageData?.length || 0}</StatNumber>
+                  <StatNumber>{stats.activeTargets}</StatNumber>
                   <StatHelpText>Currently in rotation</StatHelpText>
                 </Stat>
               </CardBody>
             </Card>
           </SimpleGrid>
 
-          <Tabs variant="enclosed" mb={6}>
+          <Tabs variant="enclosed" colorScheme="blue" mb={6}>
             <TabList>
               <Tab>Request Volume</Tab>
-              {/* Update tab label */}
               <Tab>Target Usage</Tab>
               <Tab>Model Usage</Tab>
+              <Tab>Hourly Breakdown</Tab>
             </TabList>
 
             <TabPanels>
               <TabPanel p={0} pt={4}>
-                {/* --- Request Volume Over Time (Line Chart) --- */}
                 <Card
                   bg={cardBg}
                   borderWidth="1px"
                   borderColor={borderColor}
                   borderRadius="lg"
                   shadow="sm"
-                  mb={6} // Add margin bottom
                 >
                   <CardHeader>
                     <Heading size="md">Request Volume Over Time</Heading>
-                    {/* Update description */}
-                    <Text fontSize="sm" color="gray.500">Total successful requests and target errors based on selected time range.</Text>
                   </CardHeader>
-                  <Divider borderColor={borderColor} />
+                  <Divider />
                   <CardBody>
-                    {stats.requestData && stats.requestData.length > 0 ? (
-                      <Box h="400px">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={stats.requestData}
-                            margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke={borderColor} />
-                           {/* XAxis uses 'timestamp' for 24h (UTC ISO string) and 'name' otherwise */}
-                           <XAxis
-                             dataKey={timeRange === '24h' ? 'timestamp' : 'name'}
-                             stroke={useColorModeValue("gray.600", "gray.400")}
-                             tick={{ fill: axisTickColor, fontSize: 12 }}
-                             tickFormatter={(value) => {
-                               // If 24h range, format the ISO timestamp to local HH:00
-                               if (timeRange === '24h') {
-                                 try {
-                                   const date = new Date(value);
-                                   if (!isNaN(date.getTime())) {
-                                     // Format to local time HH:00
-                                     return date.toLocaleTimeString('en-US', {
-                                       hour: '2-digit',
-                                       minute: '2-digit',
-                                       hour12: false // Use 24-hour format
-                                     });
-                                   }
-                                 } catch (e) { /* ignore format errors */ }
-                                 return value; // Fallback to raw value on error
-                               }
-                               // Otherwise (7d, 30d, 90d), the value is already the formatted name
-                               return value;
-                             }}
-                             // Optional: Adjust interval for 24h if labels overlap
-                             // interval={timeRange === '24h' ? 'preserveStartEnd' : undefined}
-                           />
-                           <YAxis stroke={useColorModeValue("gray.600", "gray.400")} tick={{ fill: axisTickColor, fontSize: 12 }}/>
-                           <RechartsTooltip
-                             contentStyle={{
-                               backgroundColor: cardBg,
-                               borderColor: borderColor,
-                             }}
-                             labelFormatter={(label) => {
-                               // Format the label in the tooltip based on range
-                               if (timeRange === '24h') {
-                                 try {
-                                   const date = new Date(label); // Label is the timestamp ISO string
-                                   if (!isNaN(date.getTime())) {
-                                     // Show full local date and time in tooltip
-                                     return date.toLocaleString('en-US', {
-                                       dateStyle: 'short', // e.g., 4/1/25
-                                       timeStyle: 'short', // e.g., 13:00
-                                       hour12: false,
-                                     });
-                                   }
-                                 } catch (e) {}
-                                 return label; // Fallback
-                               }
-                               // For other ranges, label is already formatted name (e.g., "Mon 1", "Apr 1")
-                               return label;
-                             }}
-                           />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="requests" // Represents successful requests
-                              stroke={lineColor}
-                              strokeWidth={2}
-                              activeDot={{ r: 6 }}
-                              name="Successful Requests" // Updated name
-                              dot={false}
-                            />
-                            <Line
-                              type="monotone"
-                              // Use targetErrors data key
-                              dataKey="targetErrors"
-                              stroke={errorColor}
-                              strokeWidth={2}
-                              activeDot={{ r: 6 }}
-                              // Update line name
-                              name="Target Errors"
-                              dot={false}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </Box>
-                    ) : (
-                      <Flex justify="center" align="center" h="200px">
-                        <Text color="gray.500">
-                          No request data available for this period.
-                        </Text>
-                      </Flex>
-                    )}
-                  </CardBody>
-                </Card>
-
-                {/* --- Hourly Request Distribution (Bar Chart - Primarily for 24h view) --- */}
-                <Card
-                  bg={cardBg}
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  borderRadius="lg"
-                  shadow="sm"
-                >
-                  <CardHeader>
-                    <Heading size="md">Hourly Request Distribution (Last 24h)</Heading>
-                     <Text fontSize="sm" color="gray.500">Successful requests per hour over the last 24 hours (UTC).</Text>
-                  </CardHeader>
-                  <Divider borderColor={borderColor} />
-                  <CardBody>
-                    {stats.hourlyData && stats.hourlyData.length > 0 ? (
-                      <Box h="300px">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={stats.hourlyData}
-                            margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke={borderColor} />
-                            <XAxis
-                              dataKey="hour" // The raw ISO string from backend
-                              stroke={useColorModeValue("gray.600", "gray.400")}
-                              tick={{ fill: axisTickColor, fontSize: 12 }} // Use defined axisTickColor
-                              tickFormatter={(isoString) => {
-                                // Format the ISO string for display
-                                try {
-                                  const date = new Date(isoString);
-                                  if (!isNaN(date.getTime())) {
-                                    // Format as "MMM DD HH:00" e.g., "Mar 29 09:00"
-                                    return date.toLocaleTimeString('en-US', {
-                                      // month: 'short',
-                                      // day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: false, // Use 24-hour format
-                                      timeZone: 'UTC' // Display in UTC
-                                    });
-                                  }
-                                } catch (e) { /* ignore */ }
-                                return isoString; // Fallback
-                              }}
-                              // Optional: Adjust interval if too many labels overlap
-                              // interval="preserveStartEnd" // or a number like 2 or 3
-                            />
-                            <YAxis stroke={useColorModeValue("gray.600", "gray.400")} tick={{ fill: axisTickColor, fontSize: 12 }}/>
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: cardBg,
-                                borderColor: borderColor,
-                              }}
-                              labelFormatter={(label) => {
-                                 // Format the label in the tooltip as well
-                                 try {
-                                  const date = new Date(label);
-                                   if (!isNaN(date.getTime())) {
-                                     return date.toLocaleString('en-US', {
-                                       dateStyle: 'medium',
-                                       timeStyle: 'short',
-                                       hour12: false,
-                                       timeZone: 'UTC'
-                                     });
-                                   }
-                                 } catch(e) {}
-                                 return label;
-                              }}
-                            />
-                            <Legend />
-                            <Bar
-                              dataKey="requests"
-                              fill={lineColor}
-                              name="Successful Requests" // Updated name
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </Box>
-                    ) : (
-                      <Flex justify="center" align="center" h="200px">
-                        <Text color="gray.500">
-                          No hourly data available.
-                        </Text>
-                      </Flex>
-                    )}
+                    <Box h="400px">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={formattedRequestData} // Use formatted data
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 25, // Reverted bottom margin
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="localTimeLabel" // Use formatted label
+                            tick={{ fill: axisTickColor }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={100} // Increased XAxis height
+                          />
+                          <YAxis tick={{ fill: axisTickColor }} />
+                          <RechartsTooltip
+                            formatter={(value: number, name: string, props: any) => {
+                                // Display local time in tooltip label if available
+                                const label = props.payload?.localTimeLabel || props.label;
+                                return [formatTooltipValue(value), name, label];
+                            }}
+                            labelFormatter={(label: string, payload: any[]) => {
+                                // Attempt to show local time as the main label in tooltip
+                                const entry = payload?.[0]?.payload;
+                                return entry?.localTimeLabel || label;
+                            }}
+                            contentStyle={{
+                              backgroundColor: cardBg,
+                              borderColor: borderColor,
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="requests"
+                            name="Requests"
+                            stroke={lineColor}
+                            activeDot={{ r: 8 }}
+                            strokeWidth={2}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="errors"
+                            name="Errors"
+                            stroke={errorColor}
+                            strokeWidth={2}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="targetErrors"
+                            name="Target Errors"
+                            stroke="#FF8C00"
+                            strokeWidth={2}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </Box>
                   </CardBody>
                 </Card>
               </TabPanel>
@@ -462,52 +367,50 @@ export default function StatsPage() {
                   shadow="sm"
                 >
                   <CardHeader>
-                    {/* Update heading */}
                     <Heading size="md">Target Usage Distribution</Heading>
                   </CardHeader>
-                  <Divider borderColor={borderColor} />
+                  <Divider />
                   <CardBody>
-                    {/* Use targetUsageData */}
-                    {stats.targetUsageData?.length > 0 ? (
-                      <Box h="400px">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={stats.targetUsageData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={true}
-                              label={({ name, percent }) =>
-                                `${name}: ${(percent * 100).toFixed(0)}%`
-                              }
-                              outerRadius={150}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {/* Use targetUsageData */}
-                              {stats.targetUsageData.map(
-                                (entry: any, index: number) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={COLORS[index % COLORS.length]}
-                                  />
-                                )
-                              )}
-                            </Pie>
-                            <RechartsTooltip
-                              formatter={(value: number, name: string, entry: any) => [`${value} requests (${(entry.payload.percent * 100).toFixed(1)}%)`, name]}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </Box>
-                    ) : (
-                      <Flex justify="center" align="center" h="200px">
-                        <Text color="gray.500">
-                          {/* Update text */}
-                          No target usage data available
-                        </Text>
-                      </Flex>
-                    )}
+                    <Box h="400px">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={stats.targetUsageData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            outerRadius={150}
+                            fill="#8884d8"
+                            dataKey="value"
+                            nameKey="name"
+                            label={({ name, percent }) =>
+                              `${name}: ${(percent * 100).toFixed(1)}%`
+                            }
+                          >
+                            {stats.targetUsageData.map(
+                              (entry: any, index: number) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={COLORS[index % COLORS.length]}
+                                  opacity={entry.isActive ? 1 : 0.5}
+                                />
+                              )
+                            )}
+                          </Pie>
+                          <RechartsTooltip
+                            formatter={(value: number, name: string) => [
+                              value.toLocaleString(),
+                              name,
+                            ]}
+                            contentStyle={{
+                              backgroundColor: cardBg,
+                              borderColor: borderColor,
+                            }}
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Box>
                   </CardBody>
                 </Card>
               </TabPanel>
@@ -523,53 +426,128 @@ export default function StatsPage() {
                   <CardHeader>
                     <Heading size="md">Model Usage Distribution</Heading>
                   </CardHeader>
-                  <Divider borderColor={borderColor} />
+                  <Divider />
                   <CardBody>
-                    {stats.modelUsageData?.length > 0 ? (
+                    {stats.modelUsageData.length > 0 ? (
                       <Box h="400px">
                         <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={stats.modelUsageData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={true}
-                              label={({ name, percent }) =>
-                                `${name}: ${(percent * 100).toFixed(0)}%`
-                              }
-                              outerRadius={150}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {stats.modelUsageData.map(
-                                (entry: any, index: number) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={COLORS[index % COLORS.length]}
-                                  />
-                                )
-                              )}
-                            </Pie>
-                            <RechartsTooltip
-                              formatter={(value: any) => `${value}%`}
-                            />
-                          </PieChart>
+                           <PieChart>
+                             <Pie
+                               data={stats.modelUsageData}
+                               cx="50%"
+                               cy="50%"
+                               labelLine={true}
+                               outerRadius={150}
+                               fill="#8884d8"
+                               dataKey="value"
+                               nameKey="name"
+                               label={({ name, percent }) =>
+                                 `${name}: ${(percent * 100).toFixed(1)}%`
+                               }
+                             >
+                               {stats.modelUsageData.map(
+                                 (entry: any, index: number) => (
+                                   <Cell
+                                     key={`cell-${index}`}
+                                     fill={COLORS[index % COLORS.length]}
+                                   />
+                                 )
+                               )}
+                             </Pie>
+                             <RechartsTooltip
+                               formatter={(value: number, name: string) => [
+                                 value.toLocaleString(),
+                                 name,
+                               ]}
+                               contentStyle={{
+                                 backgroundColor: cardBg,
+                                 borderColor: borderColor,
+                               }}
+                             />
+                             <Legend />
+                           </PieChart>
                         </ResponsiveContainer>
                       </Box>
                     ) : (
-                      <Flex justify="center" align="center" h="200px">
-                        <Text color="gray.500">
-                          No model usage data available
-                        </Text>
-                      </Flex>
+                      <Text>No model usage data available for this period.</Text>
                     )}
+                  </CardBody>
+                </Card>
+              </TabPanel>
+
+              <TabPanel p={0} pt={4}>
+                <Card
+                  bg={cardBg}
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                  borderRadius="lg"
+                  shadow="sm"
+                >
+                  <CardHeader>
+                    <Heading size="md">Hourly Request Volume (Last 24h)</Heading>
+                  </CardHeader>
+                  <Divider />
+                  <CardBody>
+                    <Box h="400px">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={formattedHourlyData} // Use formatted data
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 25, // Reverted bottom margin
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="localTimeLabel" // Use formatted label
+                            tick={{ fill: axisTickColor }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={100} // Increased XAxis height
+                          />
+                          <YAxis tick={{ fill: axisTickColor }} />
+                          <RechartsTooltip
+                            formatter={(value: number, name: string, props: any) => {
+                                // Display local time in tooltip label if available
+                                const label = props.payload?.localTimeLabel || props.label;
+                                return [formatTooltipValue(value), name, label];
+                            }}
+                             labelFormatter={(label: string, payload: any[]) => {
+                                // Attempt to show local time as the main label in tooltip
+                                const entry = payload?.[0]?.payload;
+                                return entry?.localTimeLabel || label;
+                            }}
+                            contentStyle={{
+                              backgroundColor: cardBg,
+                              borderColor: borderColor,
+                            }}
+                          />
+                          <Legend />
+                          <Bar
+                            dataKey="requests"
+                            name="Requests"
+                            fill="#3182CE"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Box>
                   </CardBody>
                 </Card>
               </TabPanel>
             </TabPanels>
           </Tabs>
         </>
-      ) : null}
+      ) : (
+        <Alert status="info" mb={6} borderRadius="md">
+          <AlertIcon />
+          <AlertTitle>No Data</AlertTitle>
+          <AlertDescription>
+            No statistics available. Try changing the time range or refreshing.
+          </AlertDescription>
+        </Alert>
+      )}
     </AppLayout>
   );
 }
