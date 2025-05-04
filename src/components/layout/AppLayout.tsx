@@ -10,25 +10,16 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  // Keep track of the sidebar's actual width (can be '60px' or '250px')
-  const [sidebarActualWidth, setSidebarActualWidth] = useState("250px");
-
-  // Callback function for Sidebar to report its current width
-  const handleSidebarResize = (width: string) => {
-    setSidebarActualWidth(width);
-  };
+  // No longer need to track sidebar width here, let flexbox handle it.
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <Sidebar onResize={handleSidebarResize} />
+      {/* Sidebar - remove the onResize prop */}
+      <Sidebar />
 
-      {/* Main Content Area */}
-      {/* Apply margin-left dynamically based on sidebar width */}
-      <main
-        className="flex-1 overflow-y-auto p-6 transition-[margin-left] duration-200 ease-in-out"
-        style={{ marginLeft: sidebarActualWidth }}
-      >
+      {/* Main Content Area - remove dynamic marginLeft and transition */}
+      <main className="flex-1 p-6 overflow-y-auto">
+        {/* The Sidebar's width transition will naturally push this content */}
         {children}
       </main>
 

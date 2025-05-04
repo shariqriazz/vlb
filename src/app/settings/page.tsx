@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useTheme } from 'next-themes';
-import { Save, RefreshCw, Download, Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { Save, RefreshCw, Download, Upload, AlertCircle, CheckCircle, Loader2, BarChart3, Clock, Server } from 'lucide-react'; // Added summary card icons
+import { cn } from "@/lib/utils"; // Import cn utility
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Assuming Select was added previously
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -36,22 +37,36 @@ export default function SettingsPage() {
     failoverDelaySeconds: 2,
   });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // For main settings data
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // For main settings actions
   const [isSaved, setIsSaved] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ message: string; details?: any } | null>(null);
+  const [timeRange, setTimeRange] = useState("7d"); // Add timeRange state
+  const [summaryStatsData, setSummaryStatsData] = useState<any>(null); // State for stats API data
+  const [summaryStatsLoading, setSummaryStatsLoading] = useState<boolean>(true); // Loading state for summary cards
+  const [summaryStatsError, setSummaryStatsError] = useState<string | null>(null); // Error state for summary cards
+  const [isClient, setIsClient] = useState<boolean>(false); // State to track client-side mount
 
   const { toast } = useToast();
   const { theme, setTheme } = useTheme(); // Use next-themes hook
 
+  // Simplified stats structure for summary cards
+  const [summaryStats, setSummaryStats] = useState({
+      totalRequests: 0,
+      successRate: 0,
+      avgResponseTime: 0,
+      activeTargets: 0
+  });
+
+
   const fetchSettings = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); // Keep this for the main settings form
+    setError(null); // Reset main settings error
     setIsSaved(false); // Reset saved state on fetch
 
     try {
@@ -64,7 +79,7 @@ export default function SettingsPage() {
       setSettings(data);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to fetch settings';
-      setError(errorMessage);
+      setError(errorMessage); // Set main settings error
       console.error('Error fetching settings:', err);
       toast({
         title: 'Error Fetching Settings',
@@ -72,17 +87,74 @@ export default function SettingsPage() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Keep this for the main settings form
     }
   }, [toast]); // Add toast to dependency array
 
+  // --- Formatters ---
+  const formatPercentage = (value: number | undefined | null): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return "N/A";
+    }
+    return `${value.toFixed(1)}%`;
+  };
+
+  const formatNumber = (value: number | undefined | null): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+        return "N/A";
+    }
+    return value.toLocaleString();
+  }
+  // --- End Formatters ---
+
+  // Fetch data for the summary cards
+  const fetchSummaryStats = useCallback(async () => {
+    setSummaryStatsLoading(true);
+    setSummaryStatsError(null);
+    try {
+      const response = await fetch(`/api/stats?timeRange=${timeRange}`);
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Error fetching summary statistics (${response.status}): ${errorData || response.statusText}`);
+      }
+      const data = await response.json();
+      setSummaryStatsData(data);
+      setSummaryStats({
+        totalRequests: data?.totalRequests ?? 0,
+        successRate: data?.successRate ?? 0,
+        avgResponseTime: data?.avgResponseTime ?? 0,
+        activeTargets: data?.activeTargets ?? 0,
+      });
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to fetch summary statistics";
+      setSummaryStatsError(errorMessage);
+      console.error("Error fetching summary stats:", err);
+      // Don't toast here, show alert below header
+    } finally {
+      setSummaryStatsLoading(false);
+    }
+  }, [timeRange]); // Removed toast dependency
+
+
   useEffect(() => {
     fetchSettings();
-  }, [fetchSettings]); // fetchSettings is stable due to useCallback
+    fetchSummaryStats(); // Fetch summary stats initially
+  }, [fetchSettings]); // fetchSettings is stable
+
+  // Re-fetch summary stats when timeRange changes
+  useEffect(() => {
+     fetchSummaryStats();
+  }, [timeRange, fetchSummaryStats]);
+
+  // Set isClient to true after mounting
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   const handleSaveSettings = async () => {
     setIsSaving(true);
-    setError(null);
+    setError(null); // Reset main settings error
     setIsSaved(false);
 
     try {
@@ -250,55 +322,139 @@ export default function SettingsPage() {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="p-6">
-          <div className="flex justify-center items-center h-[80vh]">
-            {/* Basic Loading Indicator */}
-            <div className="flex items-center space-x-2 text-muted-foreground">
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>Loading Settings...</span>
-            </div>
-            {/* Or use Skeleton */}
-            {/* <div className="w-full space-y-4">
-                <Skeleton className="w-1/4 h-10" />
-                <Skeleton className="w-1/2 h-4" />
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <Skeleton className="h-64" />
-                    <Skeleton className="h-64" />
-                </div>
-                <Skeleton className="h-48" />
-                <Skeleton className="self-end w-32 h-10" />
-            </div> */}
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  // Removed the full page loading state based on `isLoading` for settings
 
   return (
     <AppLayout>
       <TooltipProvider>
         <div className="p-6 space-y-6"> {/* Added padding and spacing */}
-          <div className="flex items-center justify-between">
+
+          {/* Header copied from stats page */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-semibold">Settings</h1>
-              <p className="text-muted-foreground">Configure your Load Balancer</p>
+              <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+              <p className="text-sm text-muted-foreground">Configure your Load Balancer</p>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={fetchSettings} disabled={isLoading}>
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Refresh Settings</p>
-              </TooltipContent>
-            </Tooltip>
+
+            <div className="flex items-center gap-2">
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select time range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24h">Last 24 Hours</SelectItem>
+                  <SelectItem value="7d">Last 7 Days</SelectItem>
+                  <SelectItem value="30d">Last 30 Days</SelectItem>
+                  <SelectItem value="90d">Last 90 Days</SelectItem>
+                </SelectContent>
+              </Select>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* Refresh button fetches both summary and main settings */}
+                  <Button variant="outline" size="icon" onClick={() => { fetchSummaryStats(); fetchSettings(); }} disabled={summaryStatsLoading || isLoading}>
+                    <RefreshCw className={cn("h-4 w-4", (summaryStatsLoading || isLoading) && "animate-spin")} /> {/* Removed text-primary */}
+                    <span className="sr-only">Refresh stats and settings</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Refresh Stats & Settings</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
-          {error && (
+          {/* Wrap content in client-side check */}
+          {!isClient ? (
+            <div className="space-y-6">
+               {/* Placeholder for summary cards */}
+               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Card><CardContent className="pt-6 h-[108px] flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+                  <Card><CardContent className="pt-6 h-[108px] flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+                  <Card><CardContent className="pt-6 h-[108px] flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+                  <Card><CardContent className="pt-6 h-[108px] flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+               </div>
+               {/* Placeholder for settings cards */}
+               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                 <Skeleton className="h-[400px]" />
+                 <Skeleton className="h-[480px]" />
+               </div>
+               {/* Placeholder for Backup/Restore */}
+               <Skeleton className="h-[250px]" />
+               {/* Placeholder for Save Button */}
+               <div className="flex justify-end">
+                  <Skeleton className="w-32 h-10" />
+               </div>
+            </div>
+          ) : (
+           <>
+             {/* Display summary stats error if exists */}
+             {summaryStatsError && (
+                <Alert variant="destructive">
+               <AlertCircle className="w-4 h-4" />
+               <AlertTitle>Error Fetching Summary Stats</AlertTitle>
+               <AlertDescription>{summaryStatsError}</AlertDescription>
+             </Alert>
+          )}
+
+          {/* Stats Summary Cards copied from stats page */}
+          {summaryStatsLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card><CardContent className="pt-6"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+              <Card><CardContent className="pt-6"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+              <Card><CardContent className="pt-6"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+              <Card><CardContent className="pt-6"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></CardContent></Card>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+               <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-1)/0.2)] to-transparent opacity-50 pointer-events-none" />
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
+                    <BarChart3 className="w-5 h-5 text-[hsl(var(--chart-1))]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatNumber(summaryStats.totalRequests)}</div>
+                    <p className="text-xs text-muted-foreground">Lifetime total</p>
+                  </CardContent>
+                </Card>
+               <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-2)/0.2)] to-transparent opacity-50 pointer-events-none" />
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+                    <CheckCircle className="w-5 h-5 text-[hsl(var(--chart-2))]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatPercentage(summaryStats.successRate)}</div>
+                    <p className="text-xs text-muted-foreground">In selected period</p>
+                  </CardContent>
+                </Card>
+               <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-3)/0.2)] to-transparent opacity-50 pointer-events-none" />
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
+                    <Clock className="w-5 h-5 text-[hsl(var(--chart-3))]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{summaryStats.avgResponseTime !== null && summaryStats.avgResponseTime !== undefined ? `${Math.round(summaryStats.avgResponseTime)}ms` : 'N/A'}</div>
+                    <p className="text-xs text-muted-foreground">Across successful requests</p>
+                  </CardContent>
+                </Card>
+               <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-4)/0.2)] to-transparent opacity-50 pointer-events-none" />
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Active Targets</CardTitle>
+                    <Server className="w-5 h-5 text-[hsl(var(--chart-4))]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatNumber(summaryStats.activeTargets)}</div>
+                    <p className="text-xs text-muted-foreground">Currently in rotation</p>
+                  </CardContent>
+                </Card>
+            </div>
+          )}
+
+           {/* Display main settings error */}
+           {error && (
             <Alert variant="destructive">
               <AlertCircle className="w-4 h-4" />
               <AlertTitle>Error!</AlertTitle>
@@ -445,7 +601,7 @@ export default function SettingsPage() {
                     >
                         {isCleaning ? (
                             <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> {/* Removed text-primary */}
                                 Cleaning...
                             </>
                         ) : (
@@ -515,7 +671,7 @@ export default function SettingsPage() {
                   >
                     {isImporting ? (
                       <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> {/* Removed text-primary */}
                         Restoring...
                       </>
                     ) : (
@@ -527,27 +683,30 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 {importResult && (
-                   <div className={`mt-3 p-3 border rounded-md ${importResult.message.startsWith('Error:') ? 'border-destructive bg-destructive/10 text-destructive' : 'border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400'}`}>
-                    <p className="text-sm font-semibold">
-                        {importResult.message.startsWith('Error:') ? 'Import Failed' : 'Import Result'}
-                    </p>
-                    <p className="mt-1 text-xs break-words">{importResult.message}</p>
-                    {importResult.details?.results?.errors?.length > 0 && (
+                  <Alert variant={importResult.message.startsWith('Error:') ? 'destructive' : 'default'} className="mt-3">
+                    {importResult.message.startsWith('Error:') ? <AlertCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" /> }
+                    <AlertTitle>
+                      {importResult.message.startsWith('Error:') ? 'Import Failed' : 'Import Result'}
+                    </AlertTitle>
+                    <AlertDescription className="break-words">
+                      {importResult.message}
+                      {importResult.details?.results?.errors?.length > 0 && (
                         <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="ml-1 text-xs underline cursor-help">(details)</span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs break-words">
-                                <p>Errors:</p>
-                                <ul className="pl-4 list-disc">
-                                    {importResult.details.results.errors.map((err: string, index: number) => (
-                                        <li key={index}>{err}</li>
-                                    ))}
-                                </ul>
-                            </TooltipContent>
+                          <TooltipTrigger asChild>
+                            <span className="ml-1 text-xs underline cursor-help">(details)</span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs break-words">
+                            <p className="font-semibold">Errors:</p>
+                            <ul className="pl-4 list-disc">
+                              {importResult.details.results.errors.map((err: string, index: number) => (
+                                <li key={index}>{err}</li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
                         </Tooltip>
-                    )}
-                </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
             </CardContent>
@@ -557,7 +716,7 @@ export default function SettingsPage() {
             <Button onClick={handleSaveSettings} disabled={isSaving}>
               {isSaving ? (
                 <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> {/* Removed text-primary */}
                   Saving...
                 </>
               ) : (
@@ -567,9 +726,11 @@ export default function SettingsPage() {
                 </>
               )}
             </Button>
-          </div>
-        </div>
-      </TooltipProvider>
-    </AppLayout>
+          </div> {/* End of Save Button div */}
+          </>
+        )} {/* End of isClient conditional rendering */}
+      </div> {/* End of p-6 space-y-6 div */}
+    </TooltipProvider>
+  </AppLayout>
   );
 }

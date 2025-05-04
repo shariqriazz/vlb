@@ -18,7 +18,16 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { RefreshCw, AlertTriangle, Info, Loader2 } from "lucide-react";
+import {
+  RefreshCw,
+  AlertTriangle,
+  Info,
+  Loader2,
+  BarChart3,
+  CheckCircle,
+  Clock,
+  Server
+} from "lucide-react";
 
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,21 +73,45 @@ interface PieChartEntry {
 
 // --- Chart Config --- (Using CSS variables defined in globals.css)
 const chartConfig = {
-  requests: { label: "Requests", color: "hsl(var(--chart-1))" },
-  errors: { label: "Errors", color: "hsl(var(--chart-2))" }, // Use chart-2 for errors
-  targetErrors: { label: "Target Errors", color: "hsl(var(--chart-3))" }, // Use chart-3 for target errors
-  modelUsage: { label: "Models", color: "hsl(var(--chart-4))" },
-  targetUsage: { label: "Targets", color: "hsl(var(--chart-5))" },
-} satisfies Record<string, { label: string; color: string }>;
+  requests: {
+    label: "Requests",
+    color: "hsl(var(--chart-1))",
+    gradient: "var(--gradient-1)"
+  },
+  errors: {
+    label: "Errors",
+    color: "hsl(var(--chart-2))",
+    gradient: "var(--gradient-2)"
+  },
+  targetErrors: {
+    label: "Target Errors",
+    color: "hsl(var(--chart-3))",
+    gradient: "var(--gradient-3)"
+  },
+  modelUsage: {
+    label: "Models",
+    color: "hsl(var(--chart-4))",
+    gradient: "var(--gradient-4)"
+  },
+  targetUsage: {
+    label: "Targets",
+    color: "hsl(var(--chart-5))",
+    gradient: "var(--gradient-5)"
+  },
+};
 
-// Colors for pie charts (fallback if CSS vars aren't enough)
+// Colors for pie charts with enhanced visual appeal
 const PIE_COLORS = [
     "hsl(var(--chart-1))",
     "hsl(var(--chart-2))",
     "hsl(var(--chart-3))",
     "hsl(var(--chart-4))",
     "hsl(var(--chart-5))",
-    "#82CA9D", // Example fallback color
+    "hsl(190, 80%, 50%)",
+    "hsl(120, 70%, 50%)",
+    "hsl(60, 80%, 60%)",
+    "hsl(30, 90%, 60%)",
+    "hsl(300, 70%, 60%)",
 ];
 // --- End Chart Config ---
 
@@ -252,40 +285,44 @@ export default function StatsPage() {
         <>
           {/* Stats Summary Cards */}
           <div className="grid gap-4 mb-6 md:grid-cols-2 lg:grid-cols-4">
-             <Card>
+             <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-1)/0.2)] to-transparent opacity-50 pointer-events-none" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                   <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
-                  {/* Optional: Add an icon here */}
+                  <BarChart3 className="w-5 h-5 text-[hsl(var(--chart-1))]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{formatNumber(stats.totalRequests)}</div>
                   <p className="text-xs text-muted-foreground">Lifetime total</p>
                 </CardContent>
               </Card>
-             <Card>
+             <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-2)/0.2)] to-transparent opacity-50 pointer-events-none" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                   <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-                   {/* Optional: Add an icon here */}
+                  <CheckCircle className="w-5 h-5 text-[hsl(var(--chart-2))]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{formatPercentage(stats.successRate)}</div>
                   <p className="text-xs text-muted-foreground">In selected period</p>
                 </CardContent>
               </Card>
-             <Card>
+             <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-3)/0.2)] to-transparent opacity-50 pointer-events-none" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                   <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
-                  {/* Optional: Add an icon here */}
+                  <Clock className="w-5 h-5 text-[hsl(var(--chart-3))]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.avgResponseTime !== null && stats.avgResponseTime !== undefined ? `${Math.round(stats.avgResponseTime)}ms` : 'N/A'}</div>
                   <p className="text-xs text-muted-foreground">Across successful requests</p>
                 </CardContent>
               </Card>
-             <Card>
+             <Card className="overflow-hidden transition-all duration-300 border-0 shadow-md hover:shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-4)/0.2)] to-transparent opacity-50 pointer-events-none" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                   <CardTitle className="text-sm font-medium">Active Targets</CardTitle>
-                  {/* Optional: Add an icon here */}
+                  <Server className="w-5 h-5 text-[hsl(var(--chart-4))]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{formatNumber(stats.activeTargets)}</div>
@@ -296,7 +333,8 @@ export default function StatsPage() {
 
           {/* Tabs for Charts */}
            <Tabs defaultValue="volume" className="mb-6">
-            <TabsList>
+            {/* Make TabsList full width and use grid for even distribution */}
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="volume">Request Volume</TabsTrigger>
               <TabsTrigger value="target-usage">Target Usage</TabsTrigger>
               <TabsTrigger value="model-usage">Model Usage</TabsTrigger>
@@ -305,9 +343,13 @@ export default function StatsPage() {
 
             {/* Request Volume Tab */}
             <TabsContent value="volume" className="pt-4">
-               <Card>
+               <Card className="overflow-hidden border-0 shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-1)/0.05)] via-transparent to-[hsl(var(--chart-2)/0.05)] pointer-events-none" />
                 <CardHeader>
-                  <CardTitle>Request Volume Over Time</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>Request Volume Over Time</span>
+                    <div className="w-2 h-2 rounded-full bg-[hsl(var(--chart-1))]"></div>
+                  </CardTitle>
                   <CardDescription>Requests vs Errors ({timeRange})</CardDescription>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -317,13 +359,27 @@ export default function StatsPage() {
                           <LineChart
                             data={formattedRequestData}
                             margin={{
-                              top: 5,
-                              right: 10, // Adjusted margins
-                              left: 10,
+                              top: 15,
+                              right: 15,
+                              left: 15,
                               bottom: 40, // Increased bottom margin for angled labels
                             }}
                           >
-                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <defs>
+                              <linearGradient id="requestsGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1}/>
+                              </linearGradient>
+                              <linearGradient id="errorsGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.1}/>
+                              </linearGradient>
+                              <linearGradient id="targetErrorsGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.1}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
                             <XAxis
                               dataKey="date"
                               tickLine={false}
@@ -347,22 +403,39 @@ export default function StatsPage() {
                               dataKey="requests"
                               type="monotone"
                               stroke={chartConfig.requests.color}
-                              strokeWidth={2}
-                              dot={false}
+                              strokeWidth={3}
+                              dot={{ r: 2, strokeWidth: 2, fill: "white" }}
+                              activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(var(--chart-1))" }}
+                              fill="url(#requestsGradient)"
+                              isAnimationActive={true}
+                              animationDuration={1500}
+                              animationEasing="ease-in-out"
                             />
                             <Line
                               dataKey="errors"
                               type="monotone"
                               stroke={chartConfig.errors.color}
-                              strokeWidth={2}
-                              dot={false}
+                              strokeWidth={3}
+                              dot={{ r: 2, strokeWidth: 2, fill: "white" }}
+                              activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(var(--chart-2))" }}
+                              fill="url(#errorsGradient)"
+                              isAnimationActive={true}
+                              animationDuration={1500}
+                              animationEasing="ease-in-out"
+                              animationBegin={300}
                             />
-                             <Line
+                            <Line
                               dataKey="targetErrors"
                               type="monotone"
                               stroke={chartConfig.targetErrors.color}
-                              strokeWidth={2}
-                              dot={false}
+                              strokeWidth={3}
+                              dot={{ r: 2, strokeWidth: 2, fill: "white" }}
+                              activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(var(--chart-3))" }}
+                              fill="url(#targetErrorsGradient)"
+                              isAnimationActive={true}
+                              animationDuration={1500}
+                              animationEasing="ease-in-out"
+                              animationBegin={600}
                             />
                           </LineChart>
                         </ResponsiveContainer>
@@ -374,9 +447,13 @@ export default function StatsPage() {
 
             {/* Target Usage Tab */}
             <TabsContent value="target-usage" className="pt-4">
-              <Card>
+              <Card className="overflow-hidden border-0 shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-5)/0.05)] via-transparent to-[hsl(var(--chart-3)/0.05)] pointer-events-none" />
                 <CardHeader>
-                  <CardTitle>Target Usage Distribution</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>Target Usage Distribution</span>
+                    <div className="w-2 h-2 rounded-full bg-[hsl(var(--chart-5))]"></div>
+                  </CardTitle>
                   <CardDescription>Distribution of requests across targets ({timeRange})</CardDescription>
                 </CardHeader>
                  <CardContent className="pb-4">
@@ -384,6 +461,15 @@ export default function StatsPage() {
                      <ChartContainer config={chartConfig}>
                         <ResponsiveContainer width="100%" height={150}>
                           <PieChart>
+                            <defs>
+                              {targetUsageData.map((entry: PieChartEntry, index: number) => (
+                                <filter key={`filter-${index}`} id={`glow-${index}`} height="200%" width="200%" x="-50%" y="-50%">
+                                  <feGaussianBlur stdDeviation="3" result="blur" />
+                                  <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="glow" />
+                                  <feBlend in="SourceGraphic" in2="glow" mode="normal" />
+                                </filter>
+                              ))}
+                            </defs>
                              <ChartTooltip
                                 content={<ChartTooltipContent nameKey="value" hideLabel />} // Show value, hide generic label
                              />
@@ -393,17 +479,23 @@ export default function StatsPage() {
                                 nameKey="name" // Use target name
                                 cx="50%"
                                 cy="50%"
+                                innerRadius={30} // Add inner radius for donut effect
                                 outerRadius={150}
+                                paddingAngle={2} // Add padding between sectors
                                 label={({ name, percent }) =>
                                   `${name}: ${(percent * 100).toFixed(1)}%`
                                 }
                                 labelLine={true}
+                                isAnimationActive={true}
+                                animationDuration={1500}
+                                animationEasing="ease-in-out"
                               >
                                 {targetUsageData.map((entry: PieChartEntry, index: number) => (
                                     <Cell
                                         key={`cell-${index}`}
                                         fill={entry.fill} // Use pre-calculated fill
                                         opacity={entry.opacity}
+                                        filter={`url(#glow-${index})`}
                                         className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Accessibility
                                     />
                                 ))}
@@ -419,9 +511,13 @@ export default function StatsPage() {
 
             {/* Model Usage Tab */}
             <TabsContent value="model-usage" className="pt-4">
-              <Card>
+              <Card className="overflow-hidden border-0 shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-4)/0.05)] via-transparent to-[hsl(var(--chart-1)/0.05)] pointer-events-none" />
                 <CardHeader>
-                  <CardTitle>Model Usage Distribution</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>Model Usage Distribution</span>
+                    <div className="w-2 h-2 rounded-full bg-[hsl(var(--chart-4))]"></div>
+                  </CardTitle>
                   <CardDescription>Distribution of requests across models ({timeRange})</CardDescription>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -430,6 +526,18 @@ export default function StatsPage() {
                      <ChartContainer config={chartConfig}>
                         <ResponsiveContainer width="100%" height={150}>
                           <PieChart>
+                            <defs>
+                              {modelUsageData.map((entry: PieChartEntry, index: number) => (
+                                <filter key={`filter-model-${index}`} id={`glow-model-${index}`} height="200%" width="200%" x="-50%" y="-50%">
+                                  <feGaussianBlur stdDeviation="3" result="blur" />
+                                  <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="glow" />
+                                  <feBlend in="SourceGraphic" in2="glow" mode="normal" />
+                                </filter>
+                              ))}
+                              <pattern id="pattern-circles" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                <circle cx="1" cy="1" r="1" fill="rgba(255, 255, 255, 0.2)" />
+                              </pattern>
+                            </defs>
                             <ChartTooltip
                                 content={<ChartTooltipContent nameKey="value" hideLabel />}
                              />
@@ -439,16 +547,23 @@ export default function StatsPage() {
                                 nameKey="name"
                                 cx="50%"
                                 cy="50%"
+                                innerRadius={40} // Larger inner radius for more pronounced donut
                                 outerRadius={150}
+                                paddingAngle={3} // Slightly larger padding between sectors
                                 label={({ name, percent }) =>
                                   `${name}: ${(percent * 100).toFixed(1)}%`
                                 }
                                 labelLine={true}
+                                isAnimationActive={true}
+                                animationDuration={1500}
+                                animationEasing="ease-in-out"
+                                animationBegin={300} // Delay animation start for staggered effect
                               >
                                 {modelUsageData.map((entry: PieChartEntry, index: number) => (
                                     <Cell
-                                        key={`cell-${index}`}
+                                        key={`cell-model-${index}`}
                                         fill={entry.fill}
+                                        filter={`url(#glow-model-${index})`}
                                         className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                     />
                                 ))}
@@ -467,9 +582,13 @@ export default function StatsPage() {
 
              {/* Hourly Breakdown Tab */}
             <TabsContent value="hourly" className="pt-4">
-              <Card>
+              <Card className="overflow-hidden border-0 shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--chart-1)/0.05)] via-transparent to-[hsl(var(--chart-4)/0.05)] pointer-events-none" />
                 <CardHeader>
-                  <CardTitle>Hourly Request Volume</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>Hourly Request Volume</span>
+                    <div className="w-2 h-2 rounded-full bg-[hsl(var(--chart-1))]"></div>
+                  </CardTitle>
                    <CardDescription>Requests per hour (Last 24h, {userTimeZone} Time)</CardDescription>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -479,13 +598,22 @@ export default function StatsPage() {
                          <BarChart
                            data={formattedHourlyData}
                             margin={{
-                              top: 5,
-                              right: 10,
-                              left: 10,
+                              top: 15,
+                              right: 15,
+                              left: 15,
                               bottom: 40, // Increased bottom margin
                             }}
                           >
-                            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                            <defs>
+                              <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity={1}/>
+                                <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity={0.6}/>
+                              </linearGradient>
+                              <filter id="barShadow" height="130%">
+                                <feDropShadow dx="0" dy="3" stdDeviation="3" floodOpacity="0.2"/>
+                              </filter>
+                            </defs>
+                            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
                             <XAxis
                               dataKey="hour"
                               tickLine={false}
@@ -508,8 +636,12 @@ export default function StatsPage() {
                             <Bar
                               dataKey="requests"
                               name="Requests" // Added name for legend/tooltip
-                              fill={chartConfig.requests.color}
-                              radius={4} // Optional: adds rounded corners
+                              fill="url(#barGradient)"
+                              radius={[4, 4, 0, 0]} // Rounded top corners
+                              isAnimationActive={true}
+                              animationDuration={1500}
+                              animationEasing="ease-out"
+                              filter="url(#barShadow)"
                             />
                           </BarChart>
                         </ResponsiveContainer>

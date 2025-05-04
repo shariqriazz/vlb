@@ -41,10 +41,24 @@ const ChartContainer = React.forwardRef<
     children: React.ComponentProps<
       typeof RechartsPrimitive.ResponsiveContainer
     >["children"]
+    animate?: boolean
   }
->(({ id, className, children, config, ...props }, ref) => {
+>(({ id, className, children, config, animate = true, ...props }, ref) => {
   const uniqueId = React.useId()
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const [isVisible, setIsVisible] = React.useState(false)
+
+  // Animation effect when chart comes into view
+  React.useEffect(() => {
+    if (animate) {
+      const timer = setTimeout(() => {
+        setIsVisible(true)
+      }, 100)
+      return () => clearTimeout(timer)
+    } else {
+      setIsVisible(true)
+    }
+  }, [animate])
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -52,7 +66,17 @@ const ChartContainer = React.forwardRef<
         data-chart={chartId}
         ref={ref}
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          "flex aspect-video justify-center text-xs transition-all duration-700 ease-in-out",
+          "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50",
+          "[&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent",
+          "[&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border",
+          "[&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted",
+          "[&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent",
+          "[&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          "[&_.recharts-pie]:filter-none hover:[&_.recharts-pie]:drop-shadow-lg [&_.recharts-pie]:transition-all [&_.recharts-pie]:duration-300",
+          "[&_.recharts-bar]:filter-none hover:[&_.recharts-bar]:drop-shadow-md [&_.recharts-bar]:transition-all [&_.recharts-bar]:duration-300",
+          "[&_.recharts-line]:filter-none hover:[&_.recharts-line]:drop-shadow-md [&_.recharts-line]:transition-all [&_.recharts-line]:duration-300",
+          isVisible ? "opacity-100 transform-none" : "opacity-0 translate-y-4",
           className
         )}
         {...props}
@@ -91,6 +115,39 @@ ${colorConfig
     return color ? `  --color-${key}: ${color};` : null
   })
   .join("\n")}
+}
+
+/* Define gradient defs for SVG elements */
+${prefix} [data-chart=${id}] .recharts-default-defs {
+  display: block !important;
+}
+
+/* Apply gradient fills to chart elements */
+${prefix} [data-chart=${id}] .recharts-bar-rectangle path {
+  fill: var(--gradient-1, var(--color-requests));
+  transition: filter 0.3s ease;
+}
+
+${prefix} [data-chart=${id}] .recharts-bar-rectangle:hover path {
+  filter: brightness(1.1);
+}
+
+${prefix} [data-chart=${id}] .recharts-pie-sector path {
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+${prefix} [data-chart=${id}] .recharts-pie-sector:hover path {
+  transform: translateY(-3px);
+  filter: brightness(1.1);
+}
+
+${prefix} [data-chart=${id}] .recharts-line-curve {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  transition: filter 0.3s ease;
+}
+
+${prefix} [data-chart=${id}] .recharts-layer:hover .recharts-line-curve {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
 }
 `
           )
@@ -179,9 +236,14 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background/95 backdrop-blur-sm px-3 py-2 text-xs shadow-xl",
+          "animate-in fade-in-50 zoom-in-95 duration-300",
+          "dark:bg-background/90",
           className
         )}
+        style={{
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+        }}
       >
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">

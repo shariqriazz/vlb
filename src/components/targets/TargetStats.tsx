@@ -625,7 +625,7 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
 
       {/* Edit Target Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] md:max-w-[600px] bg-background"> {/* Increased width & added background */}
           <DialogHeader>
             <DialogTitle>Edit Vertex Target</DialogTitle>
           </DialogHeader>

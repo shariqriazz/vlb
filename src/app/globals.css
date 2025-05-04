@@ -58,11 +58,19 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    /* Vibrant chart colors for light mode */
+    --chart-1: 340 80% 65%; /* Vibrant pink */
+    --chart-2: 220 85% 57%; /* Electric blue */
+    --chart-3: 160 84% 39%; /* Emerald green */
+    --chart-4: 35 90% 61%;  /* Bright orange */
+    --chart-5: 270 76% 60%; /* Rich purple */
+
+    /* Gradient definitions for charts */
+    --gradient-1: linear-gradient(135deg, hsl(340 80% 65%), hsl(360 80% 65%));
+    --gradient-2: linear-gradient(135deg, hsl(220 85% 57%), hsl(200 85% 57%));
+    --gradient-3: linear-gradient(135deg, hsl(160 84% 39%), hsl(140 84% 39%));
+    --gradient-4: linear-gradient(135deg, hsl(35 90% 61%), hsl(55 90% 61%));
+    --gradient-5: linear-gradient(135deg, hsl(270 76% 60%), hsl(290 76% 60%));
     --radius: 0.5rem;
   }
   .dark {
@@ -85,11 +93,19 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Vibrant chart colors for dark mode */
+    --chart-1: 330 90% 65%; /* Neon pink */
+    --chart-2: 210 95% 60%; /* Bright blue */
+    --chart-3: 150 90% 45%; /* Glowing green */
+    --chart-4: 40 95% 65%;  /* Luminous yellow */
+    --chart-5: 280 85% 65%; /* Electric purple */
+
+    /* Gradient definitions for dark mode charts */
+    --gradient-1: linear-gradient(135deg, hsl(330 90% 65%), hsl(350 90% 65%));
+    --gradient-2: linear-gradient(135deg, hsl(210 95% 60%), hsl(190 95% 60%));
+    --gradient-3: linear-gradient(135deg, hsl(150 90% 45%), hsl(130 90% 45%));
+    --gradient-4: linear-gradient(135deg, hsl(40 95% 65%), hsl(60 95% 65%));
+    --gradient-5: linear-gradient(135deg, hsl(280 85% 65%), hsl(300 85% 65%));
   }
 }
 
