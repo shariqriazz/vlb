@@ -95,7 +95,7 @@ Note: The application runs on port 4269 by default. Modify `package.json` script
     *   **Name:** A friendly name for the target (e.g., "Gemini-Pro-US-Central1").
     *   **Project ID:** Your Google Cloud Project ID.
     *   **Location:** The Google Cloud region for your Vertex AI endpoint (e.g., `us-central1`).
-    *   **Model ID:** The specific Vertex AI model you want to target (e.g., `gemini-1.0-pro`, `gemini-1.5-flash-preview-0514`).
+    *   **Model ID:** The specific Vertex AI model you want to target (e.g., `gemini-2.5-pro-exp-03-25`).
     *   **Service Account Key:** Upload the JSON key file for the service account that has permissions to access Vertex AI in the specified project and location. The JSON content will be stored in the database.
 5.  Configure optional settings like `isActive` and daily rate limits.
 6.  Click **Save**.
@@ -208,7 +208,7 @@ To use this load balancer as an OpenAI-compatible API endpoint for your applicat
     - **API Key / Authorization Header:**
       - If `MASTER_API_KEY` is set in the load balancer's `.env.local` file, your client application **must** include the header `Authorization: Bearer <MASTER_API_KEY>` in its requests to the load balancer.
       - If `MASTER_API_KEY` is **not** set (left blank) in the load balancer's `.env.local` file, your client can typically send *any* non-empty string as the API key (e.g., `apiKey: "dummy-key"`), as the load balancer itself handles the actual authentication to Vertex AI using the managed Service Account Keys. The specific requirement might depend on the OpenAI client library you use.
-    - **Model:** You can specify *any* model name in your client request (e.g., `gpt-4`, `claude-3`). The load balancer will ignore this model name and route the request to one of its active Vertex AI targets based on its internal rotation logic. The actual model used will be the one configured in the chosen Vertex AI target (e.g., `gemini-1.5-pro-preview-0409`).
+    - **Model:** You can specify *any* model name in your client request (e.g., `gpt-4`, `claude-3`). The load balancer will ignore this model name and route the request to one of its active Vertex AI targets based on its internal rotation logic. The actual model used will be the one configured in the chosen Vertex AI target (e.g., `gemini-2.5-pro-exp-03-25`).
 
 Example client configuration (using a generic OpenAI library concept):
 
@@ -224,7 +224,7 @@ async function main() {
   const chatCompletion = await openai.chat.completions.create({
     messages: [{ role: "user", content: "Explain the theory of relativity." }],
     model: "ignored-by-load-balancer", // This model name is disregarded by the LB
-    // The actual model used will be from the selected Vertex AI target (e.g., gemini-1.5-pro)
+    // The actual model used will be from the selected Vertex AI target (e.g., gemini-2.5-pro-exp-03-25)
   });
   console.log(chatCompletion.choices[0].message);
 }

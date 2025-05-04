@@ -664,7 +664,7 @@ return (
              <FormControl isRequired mb={4}> {/* Model ID */}
               <FormLabel>Model ID</FormLabel>
               <Input
-                placeholder="gemini-1.5-pro-preview-0409"
+                placeholder="gemini-2.5-pro-exp-03-25"
                 value={editModelIdValue}
                 onChange={(e) => setEditModelIdValue(e.target.value)}
               />

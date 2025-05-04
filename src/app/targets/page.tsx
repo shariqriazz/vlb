@@ -240,7 +240,7 @@ export default function TargetsPage() { // Renamed component
              <FormControl isRequired mb={4}>
               <FormLabel>Model ID</FormLabel>
               <Input
-                placeholder="gemini-1.5-pro-preview-0409"
+                placeholder="gemini-2.5-pro-exp-03-25"
                 value={newModelId}
                 onChange={(e) => setNewModelId(e.target.value)}
               />
