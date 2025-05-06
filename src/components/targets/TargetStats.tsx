@@ -629,31 +629,32 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
           <DialogHeader>
             <DialogTitle>Edit Vertex Target</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid items-center grid-cols-4 gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name</Label>
+          <div className="flex flex-col gap-4 py-4"> {/* Changed to flex flex-col */}
+            {/* Name Field */}
+            <div className="grid gap-1"> {/* Stack Label and Input */}
+              <Label htmlFor="edit-name">Name</Label>
               <Input
                 id="edit-name"
                 placeholder="(Optional)"
                 value={editNameValue}
                 onChange={(e) => setEditNameValue(e.target.value)}
-                className="col-span-3"
               />
             </div>
-             <div className="grid items-center grid-cols-4 gap-4">
-              <Label htmlFor="edit-project-id" className="text-right">Project ID *</Label>
+            {/* Project ID Field */}
+             <div className="grid gap-1"> {/* Stack Label and Input */}
+              <Label htmlFor="edit-project-id">Project ID *</Label>
               <Input
                 id="edit-project-id"
                 placeholder="your-gcp-project-id"
                 value={editProjectIdValue}
                 onChange={(e) => setEditProjectIdValue(e.target.value)}
-                className="col-span-3"
                 required
               />
             </div>
-            <div className="grid items-center grid-cols-4 gap-4">
-              <Label htmlFor="edit-location" className="text-right">Location *</Label>
-              <div className="col-span-3">
+            {/* Location Field */}
+            <div className="grid gap-1"> {/* Stack Label and Input */}
+              <Label htmlFor="edit-location">Location *</Label>
+              <div> {/* Keep this div for custom location logic structure */}
                   {!isEditCustomLocation ? (
                     <Select value={editLocationValue} onValueChange={handleEditLocationChange}>
                       <SelectTrigger>
@@ -675,6 +676,7 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
                             value={editLocationCustomValue}
                             onChange={(e) => setEditLocationCustomValue(e.target.value)}
                             required
+                            className="flex-grow" // Allow input to grow
                         />
                         <Button
                             size="sm"
@@ -687,8 +689,9 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
                   )}
                 </div>
             </div>
-            <div className="grid items-center grid-cols-4 gap-4">
-              <Label htmlFor="edit-rate-limit" className="text-right">Daily Limit</Label>
+            {/* Daily Limit Field */}
+            <div className="grid gap-1"> {/* Stack Label and Input */}
+              <Label htmlFor="edit-rate-limit">Daily Limit</Label>
                <Input
                 id="edit-rate-limit"
                 type="number"
@@ -696,10 +699,9 @@ export default function TargetStats({ targets: initialTargets, fetchTargets, isL
                 value={editRateLimitValue}
                 onChange={(e) => setEditRateLimitValue(e.target.value)}
                 min="0"
-                className="col-span-3"
               />
+              <p className="text-xs text-muted-foreground">Max requests per target per day (UTC). Leave empty or set to 0 for unlimited.</p> {/* Moved helper text here */}
             </div>
-             <p className="col-span-3 col-start-2 text-xs text-muted-foreground">Max requests per target per day (UTC). Leave empty or set to 0 for unlimited.</p>
           </div>
           <DialogFooter>
              <DialogClose asChild>
