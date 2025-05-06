@@ -253,8 +253,8 @@ export default function Sidebar() {
                   ) : (
                     <Moon className="w-4 h-4" />
                   ))}
-                  {/* Keep text for layout consistency, but could also hide if needed */}
-                  {!isCollapsed && (
+                  {/* Only render text after mounted to prevent hydration mismatch */}
+                  {!isCollapsed && isMounted && (
                     <span className="ml-2 text-sm">
                       {currentTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                     </span>

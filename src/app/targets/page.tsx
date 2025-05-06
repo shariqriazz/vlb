@@ -313,21 +313,21 @@ export default function TargetsPage() {
               <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogTrigger asChild>
                   <Button>
-                    <Plus className="w-4 h-4 mr-2" /> Add Target
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Target
                   </Button>
                 </DialogTrigger>
-                {/* Dialog Content remains the same */}
-                 <DialogContent className={cn("sm:max-w-[425px] md:max-w-[600px]", "bg-background")}> {/* Added bg-background */}
-                   <DialogHeader>
+                 <DialogContent className="sm:max-w-[425px] md:max-w-[600px]">
+                   <DialogHeader className="pb-2">
                      <DialogTitle>Add New Vertex Target</DialogTitle>
                      <DialogDescription>
                        Configure a new Vertex AI target endpoint. Ensure the Service Account has the 'Vertex AI User' role.
                      </DialogDescription>
                    </DialogHeader>
-                   <div className="grid gap-4 py-4">
+                   <div className="grid gap-5 py-4">
                      <div className="grid items-center grid-cols-4 gap-4">
                        <Label htmlFor="name" className="text-right">
-                         Name (Optional)
+                         Name <span className="text-muted-foreground">(Optional)</span>
                        </Label>
                        <Input
                          id="name"
@@ -394,24 +394,22 @@ export default function TargetsPage() {
                      </div>
                       <div className="grid items-center grid-cols-4 gap-4">
                         <Label htmlFor="sa-key-file-input" className="text-right">
-                          SA Key (JSON) <span className="text-destructive">*</span>
+                          SA Key <span className="text-destructive">*</span>
                         </Label>
-                        <Input
-                          id="sa-key-file-input"
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".json"
-                          onChange={handleFileChange}
-                          className="col-span-3"
-                        />
-                     </div>
-                      {newSaKeyFile && (
-                        <div className="grid items-center grid-cols-4 gap-4">
-                          <div className="col-span-3 col-start-2">
-                             <p className="text-sm text-muted-foreground">Selected: {newSaKeyFile.name}</p>
-                          </div>
+                        <div className="col-span-3">
+                          <Input
+                            id="sa-key-file-input"
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".json"
+                            onChange={handleFileChange}
+                            className="w-full"
+                          />
+                          {newSaKeyFile && (
+                            <p className="mt-1.5 text-xs text-muted-foreground">Selected: {newSaKeyFile.name}</p>
+                          )}
                         </div>
-                       )}
+                     </div>
                      <div className="grid items-center grid-cols-4 gap-4">
                        <Label htmlFor="dailyRateLimit" className="text-right">
                          Daily Rate Limit
@@ -427,11 +425,13 @@ export default function TargetsPage() {
                        />
                      </div>
                    </div>
-                   <DialogFooter>
+                   <DialogFooter className="pt-2">
                      <DialogClose asChild>
-                        <Button variant="ghost">Cancel</Button>
+                        <Button variant="outline">Cancel</Button>
                      </DialogClose>
-                     <Button onClick={handleAddTarget}>Add Target</Button>
+                     <Button onClick={handleAddTarget}>
+                       Add Target
+                     </Button>
                    </DialogFooter>
                  </DialogContent>
               </Dialog>
