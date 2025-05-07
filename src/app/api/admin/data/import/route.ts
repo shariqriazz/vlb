@@ -92,16 +92,18 @@ export async function POST(req: NextRequest) {
       if (importData.data.vertex_targets) { // Changed api_keys to vertex_targets
         // Updated INSERT statement for vertex_targets table with correct column names
         const stmtTargets = await db.prepare(
-          `INSERT INTO vertex_targets (_id, projectId, location, modelId, serviceAccountKeyJson, name, isActive, lastUsed, failureCount, requestCount, dailyRequestsUsed, lastResetDate, isDisabledByRateLimit, rateLimitResetAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO vertex_targets (_id, projectId, location, serviceAccountKeyJson, name, isActive, lastUsed, failureCount, requestCount, dailyRequestsUsed, lastResetDate, isDisabledByRateLimit, rateLimitResetAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         for (const target of importData.data.vertex_targets) {
           // Add basic validation if needed, or rely on DB constraints
+          // modelId is removed from the table and should not be inserted
+          const { modelId, ...targetWithoutModelId } = target; // Ensure modelId is not passed
           await stmtTargets.run(
-            target._id, target.projectId, target.location, target.modelId,
-            target.serviceAccountKeyJson,
-            target.name,
-            booleanToDb(target.isActive), // Convert boolean
+            targetWithoutModelId._id, targetWithoutModelId.projectId, targetWithoutModelId.location,
+            targetWithoutModelId.serviceAccountKeyJson,
+            targetWithoutModelId.name,
+            booleanToDb(targetWithoutModelId.isActive), // Convert boolean
             target.lastUsed,
             target.failureCount ?? 0, target.requestCount ?? 0,
             target.dailyRequestsUsed ?? 0,

@@ -110,6 +110,10 @@ export async function POST(req: NextRequest) {
                 isDisabledByRateLimit: targetData.isDisabledByRateLimit ?? false,
                 isActive: targetData.isActive ?? true,
             };
+            // Explicitly remove modelId if it exists in the imported data
+            if ('modelId' in createData) {
+              delete (createData as any).modelId;
+            }
              // Remove undefined fields that might cause issues with DB constraints if not nullable
             Object.keys(createData).forEach(k => createData[k as keyof Partial<VertexTargetData>] === undefined && delete createData[k as keyof Partial<VertexTargetData>]);
 
